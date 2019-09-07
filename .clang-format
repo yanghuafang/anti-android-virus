@@ -1,0 +1,72 @@
+# Formatting for aav's own C/C++. Apply with scripts/format.sh.
+#
+# The tree follows the Google C++ Style Guide. IndentWidth and ColumnLimit are
+# restatements of Google's own defaults, kept visible because they are the two
+# rules the guide states as numbers.
+#
+# Vendored code keeps its own style: third_party/.clang-format disables
+# formatting there, so an editor or a stray `clang-format -i` cannot reflow it.
+BasedOnStyle: Google
+IndentWidth: 2
+ColumnLimit: 80
+
+# Pointers and references bind to the type: `uint8_t* p`, `const Args& args`.
+#
+# Restated rather than inherited, because this is the one Google default whose
+# meaning changed. DerivePointerAlignment ignores PointerAlignment and copies
+# whichever spelling a file already uses, so `uint8_t *p` survives wherever it
+# appears and --check passes on both spellings. Measured here: the Google style
+# sets it true through clang-format 20 and false by 22.
+#
+# Which behaviour applies therefore depends on the clang-format major, and this
+# repo deliberately does not pin one -- CI runs the distro's clang-format on
+# ubuntu-latest while a macOS developer gets Homebrew's, routinely several
+# majors apart. Setting both options makes the rule the same on either side of
+# that gap.
+#
+# ReferenceAlignment: Pointer means "whatever PointerAlignment says", so the two
+# cannot drift apart.
+DerivePointerAlignment: false
+PointerAlignment: Left
+ReferenceAlignment: Pointer
+
+# Include order, exactly as the guide states it. Priority 0 is clang-format's
+# own slot for the related header -- dex_file.h for dex_file.cc -- so the
+# categories below start at 1:
+#
+#   0. the related header       (automatic)
+#   1. C system headers         <fcntl.h>, <sys/stat.h>
+#   2. C++ standard library     <cstdint>, <string>
+#   3. other libraries          <zlib.h>, <jni.h>, <android/log.h>
+#   4. this project             "dex/dex_file.h", "aav/factory.h"
+#
+# Group 3 is the reason this is spelled out at all. Google's default rule sends
+# every <name.h> to the C system group, which puts <zlib.h> beside <fcntl.h>.
+#
+# The C system headers are enumerated rather than matched as <name.h>, because
+# <zlib.h> is also <name.h>. Matching by shape would need the third-party rule
+# listed first to win -- clang-format takes the first matching regex -- leaving
+# the list ordered by specificity while the priorities run in a different order.
+# Enumerating makes the rules disjoint, so list order and priority order agree.
+#
+# The cost is that the enumeration is a closed list: a system header not named
+# here lands in group 3 silently. Add new ones to the first regex. Only the
+# POSIX entries can fire in aav's own sources -- modernize-deprecated-headers
+# requires <cstdio> over <stdio.h> -- but the C spellings are listed so the rule
+# stays correct if a .c file is ever added.
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex:    '^<(assert|ctype|dlfcn|errno|fcntl|float|getopt|inttypes|limits|locale|math|setjmp|signal|stdarg|stddef|stdint|stdio|stdlib|string|termios|time|unistd|wchar|wctype)\.h>'
+    Priority: 1
+  - Regex:    '^<sys/[a-z_]+\.h>'
+    Priority: 1
+  - Regex:    '^<[a-z0-9_]+>'
+    Priority: 2
+  - Regex:    '^<.*>'
+    Priority: 3
+  - Regex:    '^".*"'
+    Priority: 4
+
+# What clang-format cannot check: a project header must be included by its path
+# from an include root ("utils/log.h", never "log.h"). Enforced instead by
+# having only two internal roots -- see src/CMakeLists.txt.
