@@ -11,6 +11,12 @@ Static means no sandbox and no execution: scanning an untrusted APK costs a
 parse rather than a process, which is what makes it usable on the device it is
 protecting.
 
+Its detection method comes from the Master of Engineering thesis *"An Efficient
+Android Malware Static Detection System"* — [`docs/Thesis.md`](docs/Thesis.md)
+gives the method, the algorithms, the architecture and the evaluation it was
+measured by. The code that follows is that design, so the thesis is the place to
+read *why* a scan is shaped the way it is.
+
 > **Status:** early. This commit is the skeleton and the primitives every later
 > layer needs; the DEX parser, the signature database and the scan engine land
 > on top of them.
@@ -45,7 +51,9 @@ into the sibling `../anti-android-virus-build/`.
 ├── CMakePresets.json# debug / release
 ├── src/
 │   └── utils/       # crc32, leb128, logger — the primitives every layer uses
-└── scripts/         # build.sh, clean.sh
+├── scripts/         # build.sh, clean.sh
+└── docs/
+    └── Thesis.md    # the method this engine implements
 ```
 
 ## Why CRC32 and LEB128 first
