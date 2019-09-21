@@ -7,18 +7,20 @@
       "description": "Everything every preset agrees on. binaryDir uses ${presetName}, so a preset's name and its build directory cannot drift apart -- scripts/common.sh names those trees as $AAV_BUILD_ROOT/<preset>, and that only stays true if it is one rule rather than one copy per preset.",
       "binaryDir": "${sourceDir}/../anti-android-virus-build/${presetName}",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
+        "CMAKE_BUILD_TYPE": "Debug",
+        "AAV_BUILD_TESTS": "ON"
       }
     },
     {
       "name": "debug",
       "inherits": "base",
-      "displayName": "Debug"
+      "displayName": "Debug + tests",
+      "description": "The default working tree. AAV_BUILD_TESTS lives in the presets rather than on a command line so `cmake --preset debug && ctest --preset debug` reproduces what anyone else runs."
     },
     {
       "name": "release",
       "inherits": "base",
-      "displayName": "Release",
+      "displayName": "Release + tests",
       "description": "-O2 takes different paths through the parsers than -O0, and assert() is compiled out, so this is a separate gate rather than a variant of debug.",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
     },

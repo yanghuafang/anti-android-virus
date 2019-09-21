@@ -1,0 +1,13 @@
+# Vendored upstream code: miniz and doctest keep their own formatting.
+#
+# clang-format walks up from each file and uses the nearest config, so this
+# shadows the repo-root Google style for everything under third_party/. That
+# matters because scripts/format.sh is not the only thing that formats: an
+# editor with format-on-save, or a direct `clang-format -i`, would otherwise
+# reflow upstream sources and turn the next resync into an unreadable diff.
+#
+# SortIncludes is set explicitly because DisableFormat does not cover it --
+# clang-format still reorders includes with DisableFormat: true, which is
+# exactly the edit most likely to break a vendored source.
+DisableFormat: true
+SortIncludes: Never

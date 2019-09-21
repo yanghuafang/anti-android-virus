@@ -37,11 +37,21 @@ or, the same thing in one line:
 
 ```bash
 scripts/build.sh          # PRESET=release scripts/build.sh for -O2
+scripts/test.sh           # build with tests enabled, then run them
 scripts/clean.sh          # remove the build root
 ```
 
 Nothing is written inside the checkout: the presets and the scripts both build
 into the sibling `../anti-android-virus-build/`.
+
+## Testing
+
+Tests are built by the `debug` and `release` presets and run under CTest:
+
+```bash
+cmake --preset debug && cmake --build ../anti-android-virus-build/debug -j
+ctest --preset debug
+```
 
 ## Project layout
 
@@ -51,7 +61,10 @@ into the sibling `../anti-android-virus-build/`.
 ├── CMakePresets.json# debug / release
 ├── src/
 │   └── utils/       # crc32, leb128, logger — the primitives every layer uses
-├── scripts/         # build.sh, clean.sh
+├── tests/
+│   └── unit/        # doctest white-box unit tests (one binary)
+├── third_party/     # vendored: doctest
+├── scripts/         # build.sh, test.sh, clean.sh
 └── docs/
     └── Thesis.md    # the method this engine implements
 ```

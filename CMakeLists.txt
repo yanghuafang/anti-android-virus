@@ -11,6 +11,8 @@ project(anti_android_virus
   DESCRIPTION "Efficient Android malware static detection engine (DEX)"
   LANGUAGES C CXX)
 
+option(AAV_BUILD_TESTS "Build unit tests" OFF)
+
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
 endif()
@@ -41,3 +43,8 @@ function(aav_apply_warnings tgt)
 endfunction()
 
 add_subdirectory(src)
+
+if(AAV_BUILD_TESTS)
+  enable_testing()
+  add_subdirectory(tests)
+endif()
