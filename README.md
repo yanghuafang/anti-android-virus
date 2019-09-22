@@ -21,6 +21,19 @@ read *why* a scan is shaped the way it is.
 > layer needs; the DEX parser, the signature database and the scan engine land
 > on top of them.
 
+## Ownership
+
+Every engine object derives from `aav::IObject` and is released through
+`Destroy()`, which runs `delete this` inside the library — so a caller never
+links an `operator delete` for an engine type and a prebuilt library stays
+usable across compiler and stdlib versions. Inside the engine that call is
+never written by hand: `aav::ObjPtr<T>` is a `unique_ptr` whose deleter is
+`Destroy()`, so ownership is RAII throughout.
+
+`ObjPtr` is deliberately internal. `unique_ptr` is not ABI-stable across
+compilers, which is exactly why the public surface hands out a raw pointer and
+a `Destroy()` instead.
+
 ## Requirements
 
 - CMake ≥ 3.21
@@ -59,7 +72,11 @@ ctest --preset debug
 .
 ├── CMakeLists.txt   # root: language settings, warnings; delegates to subdirs
 ├── CMakePresets.json# debug / release
+├── include/aav/     # public SDK headers
 ├── src/
+│   ├── api/aav/     # internal object API (interfaces, factories) — not exported
+│   ├── engine/      # the object base shared by every engine object
+│   ├── platform/    # dynamic-library loader
 │   └── utils/       # crc32, leb128, logger — the primitives every layer uses
 ├── tests/
 │   └── unit/        # doctest white-box unit tests (one binary)
