@@ -21,6 +21,20 @@ read *why* a scan is shaped the way it is.
 > layer needs; the DEX parser, the signature database and the scan engine land
 > on top of them.
 
+## One abstraction, files and memory
+
+A scan target is either a file on disk or a block already in RAM, and the
+engine should not care which. `IScanObject` splits into two shapes instead:
+
+- `IStream` — sequential access with a cursor, for containers that are read
+  front to back (an APK's zip directory).
+- `ITarget` — the whole image addressable at once, for a leaf being parsed (a
+  DEX, which seeks all over its own tables).
+
+Each has a file and a memory implementation (`FileStream`/`MemStream`,
+`FileTarget`/`MemTarget`), so one set of scanners serves both an on-disk scan
+and a gateway scanning bytes it never wrote down.
+
 ## Ownership
 
 Every engine object derives from `aav::IObject` and is released through
@@ -76,7 +90,7 @@ ctest --preset debug
 ├── src/
 │   ├── api/aav/     # internal object API (interfaces, factories) — not exported
 │   ├── engine/      # the object base shared by every engine object
-│   ├── platform/    # dynamic-library loader
+│   ├── platform/    # file/memory primitives (FileStream, FileTarget, MemTarget)
 │   └── utils/       # crc32, leb128, logger — the primitives every layer uses
 ├── tests/
 │   └── unit/        # doctest white-box unit tests (one binary)

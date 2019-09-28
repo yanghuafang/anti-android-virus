@@ -4,6 +4,12 @@
 # ---------------------------------------------------------------------------
 set(AAV_SOURCES
   platform/libplatform_export.cc
+  platform/file_map.cc
+  platform/file_system.cc
+  platform/file_stream.cc
+  platform/file_target.cc
+  platform/mem_stream.cc
+  platform/mem_target.cc
   platform/module.cc
   utils/crc32.cc
   utils/log.cc
@@ -34,5 +40,9 @@ target_link_libraries(aav PRIVATE aav_internal ${CMAKE_DL_LIBS})
 if(ANDROID)
   # log.cc uses __android_log_vprint from liblog.
   target_link_libraries(aav PUBLIC log)
+endif()
+if(UNIX AND NOT APPLE)
+  # 32-bit off_t would cap a mapped file at 2 GiB on glibc; APKs get large.
+  target_compile_definitions(aav PRIVATE _FILE_OFFSET_BITS=64)
 endif()
 add_library(aav::aav ALIAS aav)
