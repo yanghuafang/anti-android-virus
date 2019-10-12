@@ -42,6 +42,12 @@ function(aav_apply_warnings tgt)
   endif()
 endfunction()
 
+# ---------------------------------------------------------------------------
+# Dependencies. zlib inflates the signature database, which is gzip-compressed
+# inside its encryption.
+# ---------------------------------------------------------------------------
+find_package(ZLIB REQUIRED)
+
 add_subdirectory(src)
 
 if(AAV_BUILD_TESTS)

@@ -52,6 +52,7 @@ a `Destroy()` instead.
 
 - CMake ≥ 3.21
 - A C++17 compiler (GCC ≥ 9, Clang ≥ 10, or Apple Clang)
+- zlib (`zlib1g-dev` on Debian/Ubuntu; preinstalled on macOS)
 
 ## Build
 
@@ -91,7 +92,7 @@ ctest --preset debug
 │   ├── api/aav/     # internal object API (interfaces, factories) — not exported
 │   ├── engine/      # the object base shared by every engine object
 │   ├── platform/    # file/memory primitives (FileStream, FileTarget, MemTarget)
-│   └── utils/       # crc32, leb128, logger — the primitives every layer uses
+│   └── utils/       # crc32, leb128, blowfish, gzip inflate, logger
 ├── tests/
 │   └── unit/        # doctest white-box unit tests (one binary)
 ├── third_party/     # vendored: doctest

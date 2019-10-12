@@ -14,6 +14,8 @@ set(AAV_SOURCES
   utils/crc32.cc
   utils/log.cc
   utils/leb128.cc
+  utils/blowfish.cc
+  utils/file_uncompress.cc
   engine/object.cc
 )
 
@@ -36,7 +38,9 @@ target_compile_features(aav PUBLIC cxx_std_17)
 # aav in with add_subdirectory().
 target_include_directories(aav PUBLIC ${PROJECT_SOURCE_DIR}/include)
 aav_apply_warnings(aav)
-target_link_libraries(aav PRIVATE aav_internal ${CMAKE_DL_LIBS})
+target_link_libraries(aav
+  PUBLIC ZLIB::ZLIB ${CMAKE_DL_LIBS}
+  PRIVATE aav_internal)
 if(ANDROID)
   # log.cc uses __android_log_vprint from liblog.
   target_link_libraries(aav PUBLIC log)
