@@ -11,10 +11,14 @@ class IFileSystem;
 class IMemStream;
 class IMemTarget;
 class IModule;
+class ISigMgr;
 
 // Object factories: construct engine objects. Each returns an owning ObjPtr
 // (nullptr on allocation failure); ownership is RAII, there is no manual
 // release. These are engine internals.
+
+// Signature database.
+ObjPtr<ISigMgr> MakeSigMgr();
 
 // Platform I/O primitives.
 ObjPtr<IFileSystem> MakeFileSystem();

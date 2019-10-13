@@ -21,6 +21,17 @@ read *why* a scan is shaped the way it is.
 > layer needs; the DEX parser, the signature database and the scan engine land
 > on top of them.
 
+## The signature database
+
+Detection data ships as one file: a header, then one section per signature
+dimension, the whole thing gzip-compressed inside Blowfish. `SigMgr` decrypts
+and inflates it once at load and hands each section to the matcher that owns
+that dimension, so nothing above it parses the container.
+
+The encryption is obfuscation and tamper-evidence, not secrecy — the key is in
+the engine. What it buys is that a database cannot be edited casually on a
+device, and that a corrupted one fails at load rather than as a wrong verdict.
+
 ## One abstraction, files and memory
 
 A scan target is either a file on disk or a block already in RAM, and the
@@ -92,6 +103,7 @@ ctest --preset debug
 │   ├── api/aav/     # internal object API (interfaces, factories) — not exported
 │   ├── engine/      # the object base shared by every engine object
 │   ├── platform/    # file/memory primitives (FileStream, FileTarget, MemTarget)
+│   ├── sig/         # signature-DB load/decrypt/decompress, format
 │   └── utils/       # crc32, leb128, blowfish, gzip inflate, logger
 ├── tests/
 │   └── unit/        # doctest white-box unit tests (one binary)

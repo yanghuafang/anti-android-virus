@@ -16,6 +16,8 @@ set(AAV_SOURCES
   utils/leb128.cc
   utils/blowfish.cc
   utils/file_uncompress.cc
+  sig/sig_mgr.cc
+  sig/libsigmgr_export.cc
   engine/object.cc
 )
 
