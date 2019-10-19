@@ -18,6 +18,8 @@ set(AAV_SOURCES
   utils/file_uncompress.cc
   sig/sig_mgr.cc
   sig/libsigmgr_export.cc
+  dex/dex_file.cc
+  dex/dex_code.cc
   engine/object.cc
 )
 

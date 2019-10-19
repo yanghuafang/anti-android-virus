@@ -17,9 +17,22 @@ gives the method, the algorithms, the architecture and the evaluation it was
 measured by. The code that follows is that design, so the thesis is the place to
 read *why* a scan is shaped the way it is.
 
-> **Status:** early. This commit is the skeleton and the primitives every later
-> layer needs; the DEX parser, the signature database and the scan engine land
-> on top of them.
+> **Status:** early. The layers are landing bottom-up; there is no engine
+> facade and no command-line scanner yet.
+
+## The DEX front end
+
+`DexFile` parses the container — header, id tables, class definitions, class
+data — and hands out one class and then one method at a time. `DexCode` walks a
+method's code item instruction by instruction and reduces it to two buffers: the
+opcode sequence, and the constant operands (the strings a method references).
+Those two buffers are what detection matches on, so the parser's job ends where
+their CRC32s begin.
+
+The parser is written from scratch and bounds-checks every offset it follows,
+because the input is hostile by definition: malware deliberately emits DEX that
+off-the-shelf tools mis-parse. Versions `035`–`040` are accepted, including the
+method-handle and `invoke-custom` opcodes DEX 038/039 added.
 
 ## The signature database
 
@@ -104,6 +117,7 @@ ctest --preset debug
 │   ├── engine/      # the object base shared by every engine object
 │   ├── platform/    # file/memory primitives (FileStream, FileTarget, MemTarget)
 │   ├── sig/         # signature-DB load/decrypt/decompress, format
+│   ├── dex/         # DEX parser: classes, methods, code items
 │   └── utils/       # crc32, leb128, blowfish, gzip inflate, logger
 ├── tests/
 │   └── unit/        # doctest white-box unit tests (one binary)
