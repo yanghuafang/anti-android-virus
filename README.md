@@ -34,6 +34,19 @@ because the input is hostile by definition: malware deliberately emits DEX that
 off-the-shelf tools mis-parse. Versions `035`–`040` are accepted, including the
 method-handle and `invoke-custom` opcodes DEX 038/039 added.
 
+## Matching class paths
+
+The first detection dimension is the package path: whole families live under one
+package, so `com.aav.sample.evil` classifies a class without looking at a single
+instruction.
+
+Matching is an Aho-Corasick trie, but keyed on the CRC32 of each dotted segment
+rather than on characters. A path has a handful of segments and thousands of
+signatures share prefixes, so one walk over the segments visits every candidate
+at once instead of testing signatures one at a time. A hit is confirmed by
+logic over the matched signature's parts — a package alone can be too broad, so
+a signature can require several paths together.
+
 ## The signature database
 
 Detection data ships as one file: a header, then one section per signature

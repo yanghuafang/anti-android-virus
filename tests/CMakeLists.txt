@@ -3,6 +3,8 @@ add_executable(aav_unit_tests
   unit/test_main.cc
   unit/test_crc32.cc
   unit/test_leb128.cc
+  unit/test_actree.cc
+  unit/test_pathlogic.cc
   unit/test_dexparse.cc
   unit/test_blowfish.cc
   unit/test_gzip.cc
