@@ -11,6 +11,7 @@
 #include "aav/object_interface.h"
 #include "aav/object_ptr.h"
 #include "dex/dex_code.h"
+#include "dex/dex_code_sig_mgr.h"  // FastOpcodes
 #include "dex/dex_file.h"
 #include "doctest.h"
 #include "utils/crc32.h"
@@ -18,6 +19,7 @@
 using aav::ClassInfo;
 using aav::DexCode;
 using aav::DexFile;
+using aav::FastOpcodes;
 using aav::FieldInfo;
 using aav::IMemTarget;
 using aav::MemSource;
@@ -65,6 +67,8 @@ static void DriveDex(std::vector<uint8_t>& buf) {
           }
           MethodInfo mi;
           df.GetMethodInfo(key, mi);
+          FastOpcodes fo;
+          code.GetFastOpcodes(fo);
           code.ParseCode();
         }
         key = 0;
@@ -76,6 +80,8 @@ static void DriveDex(std::vector<uint8_t>& buf) {
           }
           MethodInfo mi;
           df.GetMethodInfo(key, mi);
+          FastOpcodes fo;
+          code.GetFastOpcodes(fo);
           code.ParseCode();
         }
       }
@@ -243,6 +249,13 @@ TEST_CASE("DexCode: modern (DEX 038/039) opcodes walk with correct sizes") {
   DexFile df;  // unused by this code (no const-string), just a non-null ptr
   DexCode dc;
   REQUIRE(0 == dc.Init(&df, code.data(), code.data() + code.size()));
+
+  FastOpcodes fo;
+  REQUIRE(0 == dc.GetFastOpcodes(fo));
+  CHECK(fo.opcode01 == 0xfbfa);  // {fa, fb}
+  CHECK(fo.opcode23 == 0xfdfc);  // {fc, fd}
+  CHECK(fo.opcode45 == 0xfffe);  // {fe, ff}
+  CHECK(fo.opcode67 == 0xfffe);  // {fe, ff}
 
   CHECK(0 == dc.ParseCode());  // walks to the end cleanly (no -2 misalignment)
 }

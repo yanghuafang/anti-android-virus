@@ -7,6 +7,7 @@
 
 namespace aav {
 
+struct FastOpcodes;
 class DexFile;
 
 struct DexInstruction {
@@ -26,6 +27,7 @@ class DexCode {
   int Init(DexFile* dex_file, void* func_start, void* func_end);
   int Uninit();
   int ParseCode();
+  int GetFastOpcodes(FastOpcodes& fast_opcodes);
   int GetOpcodeCrC32(uint32_t& crc);
   int GetOperandStrCrC32(uint32_t& crc);
   // Split the collected operand-string buffer into individual strings (for the

@@ -9,7 +9,8 @@ add_executable(aav_unit_tests
   unit/test_blowfish.cc
   unit/test_gzip.cc
   unit/test_log.cc
-  unit/test_platform.cc)
+  unit/test_platform.cc
+  unit/test_detection.cc)
 # White-box tests drive internal components directly, so they need the engine
 # and its internal header paths, not a public surface.
 aav_apply_warnings(aav_unit_tests)

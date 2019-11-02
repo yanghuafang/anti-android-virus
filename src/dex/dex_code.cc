@@ -6,6 +6,7 @@
 #include <cstring>
 #include <new>
 
+#include "dex/dex_code_sig_mgr.h"
 #include "dex/dex_file.h"
 #include "utils/crc32.h"
 #include "utils/log.h"
@@ -413,6 +414,55 @@ int DexCode::ParseCode() {
     AAV_LOGE("DexCode::ParseCode bad_alloc: %s", e.what());
     return -1;
   }
+  return 0;
+}
+
+// The bitmap pre-filter keys off a method's first kFastOpcodesCount opcodes,
+// packed pairwise into 16-bit values. Walk just far enough to collect them
+// (applying the same inline-payload guard as ParseCode); a method with fewer
+// real instructions can never match a code signature, so report failure.
+int DexCode::GetFastOpcodes(FastOpcodes& fast_opcodes) {
+  int real_count = 0;
+  uint8_t opcodes[kFastOpcodesCount] = {0};
+  uint8_t* cur = static_cast<uint8_t*>(func_start_);
+  while (cur < static_cast<uint8_t*>(code_end_)) {
+    uint8_t opcode = *cur;
+    int size = kInstructionFirstTable[opcode].size;
+    if (size <= 0 || cur + size > static_cast<uint8_t*>(code_end_)) {
+      break;
+    }
+
+    if (opcode != 0xff &&
+        (0x2b == opcode || 0x2c == opcode || 0x26 == opcode)) {
+      int32_t payload_offset = 0;
+      std::memcpy(&payload_offset, cur + sizeof(uint16_t),
+                  sizeof(payload_offset));
+      uint8_t* payload_start = cur + (sizeof(uint16_t) * payload_offset);
+      if (payload_start >= static_cast<uint8_t*>(func_start_) &&
+          payload_start < static_cast<uint8_t*>(func_end_)) {
+        if (payload_start < static_cast<uint8_t*>(code_end_)) {
+          code_end_ = payload_start;
+        }
+      } else {
+        return -2;
+      }
+    }
+
+    cur += size;
+    opcodes[real_count] = opcode;
+    real_count++;
+    if (kFastOpcodesCount == real_count) {
+      break;
+    }
+  }
+
+  if (real_count < kFastOpcodesCount) {
+    return -1;
+  }
+  std::memcpy(&fast_opcodes.opcode01, &opcodes[0], sizeof(uint16_t));
+  std::memcpy(&fast_opcodes.opcode23, &opcodes[2], sizeof(uint16_t));
+  std::memcpy(&fast_opcodes.opcode45, &opcodes[4], sizeof(uint16_t));
+  std::memcpy(&fast_opcodes.opcode67, &opcodes[6], sizeof(uint16_t));
   return 0;
 }
 

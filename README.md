@@ -47,6 +47,20 @@ at once instead of testing signatures one at a time. A hit is confirmed by
 logic over the matched signature's parts — a package alone can be too broad, so
 a signature can require several paths together.
 
+## Matching method code
+
+The second dimension is the method body. `DexCode` already reduces a method to
+an opcode sequence and a constant-operand sequence; each becomes a CRC32, and a
+signature is a CRC to find plus a boolean expression over CRCs —
+AND/OR/XOR/NOT — that has to hold before the file is called malicious. One
+fragment is rarely a behavior; a combination is.
+
+Two things keep that cheap. The CRC tables are sorted and binary-searched, so a
+lookup is logarithmic in the number of signatures. And ahead of them sits an
+opcode **bitmap**: a method's first eight opcodes, packed pairwise, are tested
+against a per-position allow-list, so a method no signature could match is
+skipped before its CRCs are ever computed.
+
 ## The signature database
 
 Detection data ships as one file: a header, then one section per signature
