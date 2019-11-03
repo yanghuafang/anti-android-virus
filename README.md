@@ -61,6 +61,17 @@ opcode **bitmap**: a method's first eight opcodes, packed pairwise, are tested
 against a per-position allow-list, so a method no signature could match is
 skipped before its CRCs are ever computed.
 
+## Scanning a DEX
+
+`DexScanner` is the first thing that produces a verdict. It takes an `ITarget`,
+runs `DexParser` over it, and returns a `ScanResult`: whether the file is
+malicious, and the signature ids that say so. The two dimensions are merged as
+a set union — either alone is a detection, and a signature found by both is
+reported once.
+
+`IScanner` is the shape every future format shares, so an APK or an ELF scanner
+is a new implementation rather than a new caller.
+
 ## The signature database
 
 Detection data ships as one file: a header, then one section per signature

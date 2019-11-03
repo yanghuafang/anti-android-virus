@@ -11,6 +11,7 @@ class IFileSystem;
 class IMemStream;
 class IMemTarget;
 class IModule;
+class IScanner;
 class ISigMgr;
 
 // Object factories: construct engine objects. Each returns an owning ObjPtr
@@ -19,6 +20,9 @@ class ISigMgr;
 
 // Signature database.
 ObjPtr<ISigMgr> MakeSigMgr();
+
+// Scanners.
+ObjPtr<IScanner> MakeDexScanner();
 
 // Platform I/O primitives.
 ObjPtr<IFileSystem> MakeFileSystem();
