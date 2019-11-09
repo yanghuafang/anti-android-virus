@@ -18,6 +18,8 @@ set(AAV_SOURCES
   utils/file_uncompress.cc
   sig/sig_mgr.cc
   sig/libsigmgr_export.cc
+  scan/file_id.cc
+  scan/libfileid_export.cc
   dex/libdex_export.cc
   dex/dex_sig_mgr.cc
   dex/dex_path_sig_mgr.cc

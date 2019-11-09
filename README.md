@@ -61,6 +61,15 @@ opcode **bitmap**: a method's first eight opcodes, packed pairwise, are tested
 against a per-position allow-list, so a method no signature could match is
 skipped before its CRCs are ever computed.
 
+## Identifying a file
+
+A scanner is chosen by what a file *is*, not by what it is called: `FileId`
+reads the leading bytes off an `IStream` and reports DEX, ZIP, or unknown. An
+extension is attacker-controlled and a renamed APK is the oldest trick there is.
+
+Because it reads through `IStream`, the same identification runs on a path and
+on a buffer.
+
 ## Scanning a DEX
 
 `DexScanner` is the first thing that produces a verdict. It takes an `ITarget`,
@@ -155,7 +164,8 @@ ctest --preset debug
 │   ├── engine/      # the object base shared by every engine object
 │   ├── platform/    # file/memory primitives (FileStream, FileTarget, MemTarget)
 │   ├── sig/         # signature-DB load/decrypt/decompress, format
-│   ├── dex/         # DEX parser: classes, methods, code items
+│   ├── dex/         # DEX parser + path/opcode/operand/logic matchers
+│   ├── scan/        # file-type identification (FileId)
 │   └── utils/       # crc32, leb128, blowfish, gzip inflate, logger
 ├── tests/
 │   └── unit/        # doctest white-box unit tests (one binary)

@@ -11,6 +11,7 @@ class IFileSystem;
 class IMemStream;
 class IMemTarget;
 class IModule;
+class IFileId;
 class IScanner;
 class ISigMgr;
 
@@ -20,6 +21,9 @@ class ISigMgr;
 
 // Signature database.
 ObjPtr<ISigMgr> MakeSigMgr();
+
+// File-type classification.
+ObjPtr<IFileId> MakeFileId();
 
 // Scanners.
 ObjPtr<IScanner> MakeDexScanner();
