@@ -17,7 +17,7 @@ class ISigMgr;
 
 // Object factories: construct engine objects. Each returns an owning ObjPtr
 // (nullptr on allocation failure); ownership is RAII, there is no manual
-// release. These are engine internals.
+// release. These are engine internals -- external consumers use MakeEngine.
 
 // Signature database.
 ObjPtr<ISigMgr> MakeSigMgr();

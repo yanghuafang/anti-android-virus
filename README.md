@@ -17,8 +17,8 @@ gives the method, the algorithms, the architecture and the evaluation it was
 measured by. The code that follows is that design, so the thesis is the place to
 read *why* a scan is shaped the way it is.
 
-> **Status:** early. The layers are landing bottom-up; there is no engine
-> facade and no command-line scanner yet.
+> **Status:** early. The engine scans, but nothing in the tree produces a
+> signature database for it to load yet.
 
 ## The DEX front end
 
@@ -60,6 +60,39 @@ lookup is logarithmic in the number of signatures. And ahead of them sits an
 opcode **bitmap**: a method's first eight opcodes, packed pairwise, are tested
 against a per-position allow-list, so a method no signature could match is
 skipped before its CRCs are ever computed.
+
+## Embedding the engine
+
+The whole pipeline is driven through one facade, `aav/engine_interface.h` (plus
+`aav/object_interface.h`, the `IObject::Destroy()` base). That is the entire
+public API, and it is deliberately ABI-clean: only PODs, C strings and a
+callback cross the boundary — no `std::` containers or smart pointers — so a
+prebuilt library stays usable across compiler and stdlib versions. File
+identification, signature-DB loading, scanner selection and directory walking
+all sit behind it:
+
+```cpp
+#include "aav/engine_interface.h"
+
+static void on_report(const aav::ScanReport* r, void* user) {
+  if (r->is_malware) {
+    // r->path, r->sig_ids[0..sig_count), r->names[...] -- all engine-owned,
+    // valid only during this call.
+  }
+}
+
+aav::IEngine* engine = aav::MakeEngine();
+aav::EngineConfig config;   // scan_dex / recurse_dirs / verbose
+engine->Init("samples/sample.sig", &config);
+engine->Scan("path/to/file-or-dir", on_report, nullptr);
+engine->Destroy();          // release the engine (never `delete` it)
+```
+
+`aavscan` is that snippet with argument parsing and printing around it:
+
+```
+aavscan [--debug] <signature-db> <dex file or dir>
+```
 
 ## Identifying a file
 
@@ -159,9 +192,11 @@ ctest --preset debug
 ├── CMakeLists.txt   # root: language settings, warnings; delegates to subdirs
 ├── CMakePresets.json# debug / release
 ├── include/aav/     # public SDK headers
+├── apps/
+│   └── aavscan/     # CLI scanner (thin facade consumer)
 ├── src/
 │   ├── api/aav/     # internal object API (interfaces, factories) — not exported
-│   ├── engine/      # the object base shared by every engine object
+│   ├── engine/      # the IEngine facade implementation
 │   ├── platform/    # file/memory primitives (FileStream, FileTarget, MemTarget)
 │   ├── sig/         # signature-DB load/decrypt/decompress, format
 │   ├── dex/         # DEX parser + path/opcode/operand/logic matchers

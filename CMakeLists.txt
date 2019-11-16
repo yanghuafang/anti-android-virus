@@ -11,6 +11,7 @@ project(anti_android_virus
   DESCRIPTION "Efficient Android malware static detection engine (DEX)"
   LANGUAGES C CXX)
 
+option(AAV_BUILD_CLI   "Build the aavscan CLI executable" ON)
 option(AAV_BUILD_TESTS "Build unit tests" OFF)
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -48,7 +49,12 @@ endfunction()
 # ---------------------------------------------------------------------------
 find_package(ZLIB REQUIRED)
 
+# ---------------------------------------------------------------------------
+# Targets: the engine (src/) and its consumers (apps/, tests/). Each subtree
+# owns its own target definitions.
+# ---------------------------------------------------------------------------
 add_subdirectory(src)
+add_subdirectory(apps)
 
 if(AAV_BUILD_TESTS)
   enable_testing()

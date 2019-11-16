@@ -33,6 +33,7 @@ set(AAV_SOURCES
   dex/dex_code.cc
   dex/dex_scanner.cc
   dex/ac_matcher.cc
+  engine/engine.cc
   engine/object.cc
 )
 
