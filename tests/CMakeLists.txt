@@ -11,11 +11,13 @@ add_executable(aav_unit_tests
   unit/test_fileid.cc
   unit/test_log.cc
   unit/test_platform.cc
-  unit/test_detection.cc)
-# White-box tests drive internal components directly, so they need the engine
-# and its internal header paths, not a public surface.
+  unit/test_detection.cc
+  unit/test_sigmgr.cc)
+# White-box tests drive internal components directly: aav_internal supplies the
+# internal header paths, sigtool_sample the shared DB/DEX fixtures (and
+# transitively the engine and zlib).
 aav_apply_warnings(aav_unit_tests)
-target_link_libraries(aav_unit_tests PRIVATE aav aav_internal)
+target_link_libraries(aav_unit_tests PRIVATE aav_internal sigtool_sample)
 # tests/ is the root for the suite's own headers: "unit/test_support.h".
 target_include_directories(aav_unit_tests PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR})

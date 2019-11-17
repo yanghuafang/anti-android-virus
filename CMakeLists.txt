@@ -12,6 +12,7 @@ project(anti_android_virus
   LANGUAGES C CXX)
 
 option(AAV_BUILD_CLI   "Build the aavscan CLI executable" ON)
+option(AAV_BUILD_TOOLS "Build sigtool (feature/DB tooling)" ON)
 option(AAV_BUILD_TESTS "Build unit tests" OFF)
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)

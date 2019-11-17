@@ -109,3 +109,10 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
+
+# ============================================================================
+# Project-specific
+# ============================================================================
+# Generated sample fixtures (sigtool gen-sample; scripts/run.sh writes samples/)
+sample.dex
+sample.sig

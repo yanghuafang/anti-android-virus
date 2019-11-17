@@ -17,8 +17,8 @@ gives the method, the algorithms, the architecture and the evaluation it was
 measured by. The code that follows is that design, so the thesis is the place to
 read *why* a scan is shaped the way it is.
 
-> **Status:** early. The engine scans, but nothing in the tree produces a
-> signature database for it to load yet.
+> **Status:** research / educational. The bundled sample database only detects
+> a synthetic sample produced by `sigtool`; it is not a real-world malware feed.
 
 ## The DEX front end
 
@@ -60,6 +60,40 @@ lookup is logarithmic in the number of signatures. And ahead of them sits an
 opcode **bitmap**: a method's first eight opcodes, packed pairwise, are tested
 against a per-position allow-list, so a method no signature could match is
 skipped before its CRCs are ever computed.
+
+## Quick start
+
+```bash
+# 1. Configure + build (Debug, with the tests enabled)
+cmake --preset debug
+cmake --build ../anti-android-virus-build/debug -j
+
+# 2. Generate a self-consistent sample DEX + signature DB
+../anti-android-virus-build/debug/bin/sigtool gen-sample samples
+
+# 3. Scan the sample: <signature-db> <dex file or dir>
+../anti-android-virus-build/debug/bin/aavscan samples/sample.sig samples/sample.dex
+```
+
+Expected output:
+
+```
+file: samples/sample.dex
+  isMalware: 1  isWhite: 0
+  sigID: 1002  Trojan!SampleFam.a@Android.Dex
+  sigID: 1001  Trojan!SampleFam.a@Android.Dex
+scanned 1 file(s), 1 flagged, 0.000s
+```
+
+`scripts/run.sh` is those three steps in one command.
+
+`sigtool` exists because a detection engine is untestable without detection
+data, and a real malware database cannot be checked into a public repository.
+It synthesizes a DEX and the signature database that matches it, from one
+generator the unit tests reuse — so the fixtures and the tool cannot drift, and
+the whole pipeline runs with no external assets. The on-disk format the tool
+writes is documented in
+[`docs/SignatureDbFormat.md`](docs/SignatureDbFormat.md).
 
 ## Embedding the engine
 
@@ -170,6 +204,7 @@ or, the same thing in one line:
 ```bash
 scripts/build.sh          # PRESET=release scripts/build.sh for -O2
 scripts/test.sh           # build with tests enabled, then run them
+scripts/run.sh            # generate a sample and scan it end to end
 scripts/clean.sh          # remove the build root
 ```
 
@@ -193,7 +228,8 @@ ctest --preset debug
 ├── CMakePresets.json# debug / release
 ├── include/aav/     # public SDK headers
 ├── apps/
-│   └── aavscan/     # CLI scanner (thin facade consumer)
+│   ├── aavscan/     # CLI scanner (thin facade consumer)
+│   └── sigtool/     # sample DEX + signature-DB generator
 ├── src/
 │   ├── api/aav/     # internal object API (interfaces, factories) — not exported
 │   ├── engine/      # the IEngine facade implementation
@@ -205,9 +241,8 @@ ctest --preset debug
 ├── tests/
 │   └── unit/        # doctest white-box unit tests (one binary)
 ├── third_party/     # vendored: doctest
-├── scripts/         # build.sh, test.sh, clean.sh
-└── docs/
-    └── Thesis.md    # the method this engine implements
+├── scripts/         # build.sh, test.sh, run.sh, clean.sh
+└── docs/            # Thesis.md, SignatureDbFormat.md
 ```
 
 ## Why CRC32 and LEB128 first

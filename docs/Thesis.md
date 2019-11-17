@@ -358,7 +358,8 @@ loads it by reversing those steps — **decrypt → inflate → verify CRC-32 �
 — and validates the `"AAV1"` magic. Each section is `format · count ·
 packed/unpacked size · data`, and parsing is **bounds-checked against untrusted
 bytes** (running length checks, `memcpy` for unaligned reads, bounded string
-scans).
+scans). The on-disk layout is specified in
+[SignatureDbFormat.md](SignatureDbFormat.md).
 
 `DexSigMgr` is a façade over two indexes built once from the loaded database:
 
