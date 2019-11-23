@@ -1,3 +1,7 @@
+# Two kinds of test live here: unit/ holds the doctest white-box tests (one
+# aav_unit_tests binary), e2e/ holds the end-to-end drivers that generate a
+# sample with sigtool and scan it with aavscan.
+
 # Unit tests (doctest, vendored single header)
 add_executable(aav_unit_tests
   unit/test_main.cc
@@ -26,3 +30,12 @@ target_include_directories(aav_unit_tests PRIVATE
 target_include_directories(aav_unit_tests SYSTEM PRIVATE
   ${PROJECT_SOURCE_DIR}/third_party/doctest)
 add_test(NAME unit COMMAND aav_unit_tests)
+
+# End-to-end golden test: sigtool generates a sample, aavscan must detect it.
+if(TARGET sigtool AND TARGET aavscan)
+  add_test(NAME e2e_sample COMMAND ${CMAKE_COMMAND}
+    -DSIGTOOL=$<TARGET_FILE:sigtool>
+    -DAAVSCAN=$<TARGET_FILE:aavscan>
+    -DWORKDIR=${CMAKE_CURRENT_BINARY_DIR}/sample_e2e
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/e2e/scan_sample.cmake)
+endif()

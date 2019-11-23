@@ -213,7 +213,9 @@ into the sibling `../anti-android-virus-build/`.
 
 ## Testing
 
-Tests are built by the `debug` and `release` presets and run under CTest:
+Two suites, both under CTest: the doctest unit tests, and an end-to-end test
+that runs `sigtool` and `aavscan` as the user does and checks that both sample
+signatures fire.
 
 ```bash
 cmake --preset debug && cmake --build ../anti-android-virus-build/debug -j
@@ -239,7 +241,8 @@ ctest --preset debug
 │   ├── scan/        # file-type identification (FileId)
 │   └── utils/       # crc32, leb128, blowfish, gzip inflate, logger
 ├── tests/
-│   └── unit/        # doctest white-box unit tests (one binary)
+│   ├── unit/        # doctest white-box unit tests (one binary)
+│   └── e2e/         # generate-and-scan end-to-end CTest drivers
 ├── third_party/     # vendored: doctest
 ├── scripts/         # build.sh, test.sh, run.sh, clean.sh
 └── docs/            # Thesis.md, SignatureDbFormat.md
