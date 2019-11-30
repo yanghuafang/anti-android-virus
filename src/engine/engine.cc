@@ -11,6 +11,9 @@
 #include "aav/file_stream_interface.h"
 #include "aav/file_target_interface.h"
 #include "aav/load_config.h"
+#include "aav/mem_source.h"
+#include "aav/mem_stream_interface.h"
+#include "aav/mem_target_interface.h"
 #include "aav/object_ptr.h"  // internal RAII for the object factories
 #include "aav/scan_option.h"
 #include "aav/scan_result.h"
@@ -35,6 +38,8 @@ class Engine : public IEngine {
  public:
   int Init(const char* sig_db_path, const EngineConfig* config) override;
   int Scan(const char* path, ScanCallback cb, void* user_data) override;
+  int ScanBuffer(const void* data, size_t size, const char* name,
+                 ScanCallback cb, void* user_data) override;
 
  private:
   int ScanOne(const char* path, ScanCallback cb, void* user_data);
@@ -204,6 +209,60 @@ int Engine::ScanOne(const char* path, ScanCallback cb, void* user_data) {
   }
 
   Emit(path, result.get(), cb, user_data);
+  return 0;
+}
+
+int Engine::ScanBuffer(const void* data, size_t size, const char* name,
+                       ScanCallback cb, void* user_data) {
+  if (nullptr == data || 0 == size || nullptr == cb || !sig_mgr_) {
+    return -1;
+  }
+  const char* label = (name && name[0]) ? name : "<memory>";
+
+  // Wrap the buffer in a MemStream for identification -- the in-memory
+  // counterpart of the file path.
+  MemSource stream_src{};
+  stream_src.mode = 0;  // O_RDONLY
+  stream_src.name = label;
+  stream_src.buf = const_cast<void*>(data);
+  stream_src.buf_size = static_cast<int32_t>(size);
+
+  ObjPtr<IMemStream> stream = MakeMemStream();
+  if (!stream || 0 != stream->Init(&stream_src)) {
+    AAV_LOGE("engine: cannot wrap in-memory image (%s)", label);
+    return -1;
+  }
+
+  FileType type = kFileTypeUnknown;
+  if (0 != file_id_->GetFileType(stream.get(), &type)) {
+    AAV_LOGD("engine: unknown in-memory image type (%s)", label);
+    return -1;
+  }
+
+  ScanResultPtr result;
+  if (kFileTypeDex == type) {
+    if (!config_.scan_dex) {
+      return 0;
+    }
+    MemSource dex_src{};
+    dex_src.mode = 0;
+    dex_src.name = label;
+    dex_src.buf = const_cast<void*>(data);
+    dex_src.buf_size = static_cast<int32_t>(size);
+    ObjPtr<IMemTarget> target = MakeMemTarget();
+    if (!target || 0 != target->Init(&dex_src)) {
+      return -1;
+    }
+    if (0 != dex_scanner_->ScanTarget(target.get(), &scan_option_, result)) {
+      AAV_LOGE("engine: dex scan failed (%s)", label);
+      return -1;
+    }
+  } else {
+    AAV_LOGD("engine: unsupported in-memory image type (%s)", label);
+    return 0;
+  }
+
+  Emit(label, result.get(), cb, user_data);
   return 0;
 }
 

@@ -16,7 +16,8 @@ add_executable(aav_unit_tests
   unit/test_log.cc
   unit/test_platform.cc
   unit/test_detection.cc
-  unit/test_sigmgr.cc)
+  unit/test_sigmgr.cc
+  unit/test_engine.cc)
 # White-box tests drive internal components directly: aav_internal supplies the
 # internal header paths, sigtool_sample the shared DB/DEX fixtures (and
 # transitively the engine and zlib).

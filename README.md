@@ -119,6 +119,8 @@ aav::IEngine* engine = aav::MakeEngine();
 aav::EngineConfig config;   // scan_dex / recurse_dirs / verbose
 engine->Init("samples/sample.sig", &config);
 engine->Scan("path/to/file-or-dir", on_report, nullptr);
+// ...or scan an image already in RAM, with no file on disk:
+engine->ScanBuffer(bytes, size, "app.dex", on_report, nullptr);
 engine->Destroy();          // release the engine (never `delete` it)
 ```
 
@@ -160,6 +162,12 @@ the engine. What it buys is that a database cannot be edited casually on a
 device, and that a corrupted one fails at load rather than as a wrong verdict.
 
 ## One abstraction, files and memory
+
+`ScanBuffer` is what the file/memory split was for: the same scanners, the same
+identification and the same verdict, over bytes that were never written to
+disk. A gateway holds an APK in RAM already, and copying it to a temporary file
+to scan it is exactly the cost this avoids.
+
 
 A scan target is either a file on disk or a block already in RAM, and the
 engine should not care which. `IScanObject` splits into two shapes instead:

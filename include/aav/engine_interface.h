@@ -32,7 +32,7 @@ struct ScanReport {
 /// Result callback, invoked once per scanned file. `report` (and everything it
 /// points to) is engine-owned and valid only for the duration of this call --
 /// copy anything you need to outlive it. `user_data` is the opaque pointer you
-/// handed to Scan; the engine passes it straight back (never dereferencing it),
+/// handed to Scan / ScanBuffer; the engine passes it straight back (never dereferencing it),
 /// so you can thread your own context -- a results container, counters, a
 /// `this` pointer, etc. -- into the callback instead of using globals. Pass
 /// nullptr if you don't need it.
@@ -51,6 +51,13 @@ class IEngine : public IObject {
   /// set), invoking `cb` once per scanned *.dex. `user_data` is forwarded
   /// unchanged to every `cb` call (see ScanCallback). Returns 0 on success.
   virtual int Scan(const char* path, ScanCallback cb, void* user_data) = 0;
+
+  /// Scan an in-memory image with no file on disk -- useful for gateway
+  /// scanning. `name` only labels the report (may be null). `cb` is invoked
+  /// once with `user_data` forwarded through (see ScanCallback). Returns 0 on
+  /// success.
+  virtual int ScanBuffer(const void* data, size_t size, const char* name,
+                         ScanCallback cb, void* user_data) = 0;
 };
 
 /// Construct the engine (returns nullptr on failure). Release it with
