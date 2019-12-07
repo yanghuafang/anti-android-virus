@@ -14,6 +14,7 @@ project(anti_android_virus
 option(AAV_BUILD_CLI   "Build the aavscan CLI executable" ON)
 option(AAV_BUILD_TOOLS "Build sigtool (feature/DB tooling)" ON)
 option(AAV_BUILD_TESTS "Build unit tests" OFF)
+option(AAV_ENABLE_APK    "Enable APK (zip) scanning via miniz" ON)
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
@@ -29,8 +30,10 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 
 # ---------------------------------------------------------------------------
-# Warnings. Applied per target through this function rather than globally, so a
-# target that should not be judged by our rules can opt out.
+# Warnings. Applied per target rather than globally, because third_party/ is
+# vendored verbatim -- miniz and doctest are not ours to fix, and their
+# diagnostics would bury ours. Each subtree calls this on the targets it owns;
+# the vendored sources are silenced where they are compiled or included.
 # ---------------------------------------------------------------------------
 function(aav_apply_warnings tgt)
   if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
@@ -51,6 +54,21 @@ endfunction()
 find_package(ZLIB REQUIRED)
 
 # ---------------------------------------------------------------------------
+# Optional APK (zip) support via miniz. miniz is compiled straight into the
+# engine library, so the shipped .a is self-contained. MINIZ_DIR and
+# AAV_MINIZ_AVAILABLE are consumed by src/ (engine) and apps/ (sample fixtures).
+# ---------------------------------------------------------------------------
+set(AAV_MINIZ_AVAILABLE FALSE)
+set(MINIZ_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/miniz")
+if(AAV_ENABLE_APK AND EXISTS "${MINIZ_DIR}/miniz.c")
+  set(AAV_MINIZ_AVAILABLE TRUE)
+elseif(AAV_ENABLE_APK)
+  message(WARNING
+    "AAV_ENABLE_APK is ON but ${MINIZ_DIR}/miniz.c was not found; "
+    "APK/zip scanning will be disabled.")
+endif()
+
+# ---------------------------------------------------------------------------
 # Targets: the engine (src/) and its consumers (apps/, tests/). Each subtree
 # owns its own target definitions.
 # ---------------------------------------------------------------------------
@@ -61,3 +79,6 @@ if(AAV_BUILD_TESTS)
   enable_testing()
   add_subdirectory(tests)
 endif()
+
+message(STATUS "aav: APK/zip support (miniz): ${AAV_MINIZ_AVAILABLE}")
+message(STATUS "aav: build tools: ${AAV_BUILD_TOOLS}  tests: ${AAV_BUILD_TESTS}")

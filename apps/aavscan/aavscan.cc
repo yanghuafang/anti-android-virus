@@ -54,7 +54,9 @@ int main(int argc, char** argv) {
     }
   }
   if (nullptr == sig_path || nullptr == target_path) {
-    std::fprintf(stderr, "usage: aavscan [--debug] <signature-db> <dex file or dir>\n");
+    std::fprintf(
+        stderr,
+        "usage: aavscan [--debug] <signature-db> <apk|dex file or dir>\n");
     return 2;
   }
 

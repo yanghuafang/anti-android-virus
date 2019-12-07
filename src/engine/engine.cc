@@ -51,6 +51,7 @@ class Engine : public IEngine {
 
   ObjPtr<IFileId> file_id_;
   ObjPtr<ISigMgr> sig_mgr_;
+  ObjPtr<IScanner> apk_scanner_;
   ObjPtr<IScanner> dex_scanner_;
   ScanOption scan_option_{};
   EngineConfig config_{};
@@ -76,7 +77,7 @@ int Engine::Init(const char* sig_db_path, const EngineConfig* config) {
   }
   LoadFormatConfig lfc{};
   lfc.ad = 1;
-  lfc.apk = 0;
+  lfc.apk = config_.scan_apk ? 1 : 0;
   lfc.dex = config_.scan_dex ? 1 : 0;
   lfc.elf = 0;
   lfc.oat = 0;
@@ -87,6 +88,10 @@ int Engine::Init(const char* sig_db_path, const EngineConfig* config) {
     return -1;
   }
 
+  apk_scanner_ = MakeApkScanner();
+  if (!apk_scanner_ || 0 != apk_scanner_->Init(sig_mgr_.get())) {
+    return -1;
+  }
   dex_scanner_ = MakeDexScanner();
   if (!dex_scanner_ || 0 != dex_scanner_->Init(sig_mgr_.get())) {
     return -1;
@@ -94,7 +99,7 @@ int Engine::Init(const char* sig_db_path, const EngineConfig* config) {
 
   scan_option_.config.unarch = 1;
   scan_option_.config.unpack = 0;
-  scan_option_.config.apk = 0;
+  scan_option_.config.apk = config_.scan_apk ? 1 : 0;
   scan_option_.config.dex = config_.scan_dex ? 1 : 0;
   scan_option_.config.elf = 0;
   scan_option_.config.oat = 0;
@@ -126,7 +131,8 @@ void Engine::ScanDir(const char* dir, ScanCallback cb, void* user_data) {
     }
     const std::string child = it->path().string();
     const std::string name = it->path().filename().string();
-    if (config_.scan_dex && EndsWith(name, ".dex")) {
+    if ((config_.scan_apk && EndsWith(name, ".apk")) ||
+        (config_.scan_dex && EndsWith(name, ".dex"))) {
       ScanOne(child.c_str(), cb, user_data);
     } else if (config_.recurse_dirs && it->is_directory(ec)) {
       ScanDir(child.c_str(), cb, user_data);
@@ -191,7 +197,16 @@ int Engine::ScanOne(const char* path, ScanCallback cb, void* user_data) {
   }
 
   ScanResultPtr result;
-  if (kFileTypeDex == type) {
+  if (kFileTypeZip == type) {
+    if (!config_.scan_apk) {
+      return 0;
+    }
+    // The APK scanner locates classes.dex and runs the DEX detection.
+    if (0 != apk_scanner_->ScanStream(stream.get(), &scan_option_, result)) {
+      AAV_LOGE("engine: apk scan failed %s", path);
+      return -1;
+    }
+  } else if (kFileTypeDex == type) {
     if (!config_.scan_dex) {
       return 0;
     }
@@ -240,7 +255,15 @@ int Engine::ScanBuffer(const void* data, size_t size, const char* name,
   }
 
   ScanResultPtr result;
-  if (kFileTypeDex == type) {
+  if (kFileTypeZip == type) {
+    if (!config_.scan_apk) {
+      return 0;
+    }
+    if (0 != apk_scanner_->ScanStream(stream.get(), &scan_option_, result)) {
+      AAV_LOGE("engine: apk scan failed (%s)", label);
+      return -1;
+    }
+  } else if (kFileTypeDex == type) {
     if (!config_.scan_dex) {
       return 0;
     }

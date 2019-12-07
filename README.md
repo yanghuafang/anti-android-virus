@@ -71,7 +71,7 @@ cmake --build ../anti-android-virus-build/debug -j
 # 2. Generate a self-consistent sample DEX + signature DB
 ../anti-android-virus-build/debug/bin/sigtool gen-sample samples
 
-# 3. Scan the sample: <signature-db> <dex file or dir>
+# 3. Scan the sample: <signature-db> <apk|dex file or dir>
 ../anti-android-virus-build/debug/bin/aavscan samples/sample.sig samples/sample.dex
 ```
 
@@ -116,19 +116,32 @@ static void on_report(const aav::ScanReport* r, void* user) {
 }
 
 aav::IEngine* engine = aav::MakeEngine();
-aav::EngineConfig config;   // scan_dex / recurse_dirs / verbose
+aav::EngineConfig config;   // scan_apk / scan_dex / recurse_dirs / verbose
 engine->Init("samples/sample.sig", &config);
 engine->Scan("path/to/file-or-dir", on_report, nullptr);
 // ...or scan an image already in RAM, with no file on disk:
-engine->ScanBuffer(bytes, size, "app.dex", on_report, nullptr);
+// (apk/dex auto-detected)
+engine->ScanBuffer(bytes, size, "app.apk", on_report, nullptr);
 engine->Destroy();          // release the engine (never `delete` it)
 ```
 
 `aavscan` is that snippet with argument parsing and printing around it:
 
 ```
-aavscan [--debug] <signature-db> <dex file or dir>
+aavscan [--debug] <signature-db> <apk|dex file or dir>
 ```
+
+## Scanning an APK
+
+An APK is a zip, and every `classes*.dex` inside it is a scan target: multidex
+splits one app across `classes.dex`, `classes2.dex` and so on, so stopping at
+the first member misses whatever was moved out of it. `ApkScanner` unpacks each
+one into memory and runs the DEX detection over it, merging the hits into one
+verdict for the file.
+
+Unpacking uses vendored miniz — one C file, no new dependency — and members are
+scanned from RAM rather than written out, which is both faster and the only
+option when the APK itself came from a buffer.
 
 ## Identifying a file
 
@@ -200,6 +213,8 @@ a `Destroy()` instead.
 - A C++17 compiler (GCC ≥ 9, Clang ≥ 10, or Apple Clang)
 - zlib (`zlib1g-dev` on Debian/Ubuntu; preinstalled on macOS)
 
+APK/zip support (miniz) is vendored under `third_party/` — no extra dependency.
+
 ## Build
 
 ```bash
@@ -246,12 +261,12 @@ ctest --preset debug
 │   ├── platform/    # file/memory primitives (FileStream, FileTarget, MemTarget)
 │   ├── sig/         # signature-DB load/decrypt/decompress, format
 │   ├── dex/         # DEX parser + path/opcode/operand/logic matchers
-│   ├── scan/        # file-type identification (FileId)
+│   ├── scan/        # file-type id (FileId) + APK (zip) unpacking
 │   └── utils/       # crc32, leb128, blowfish, gzip inflate, logger
 ├── tests/
 │   ├── unit/        # doctest white-box unit tests (one binary)
 │   └── e2e/         # generate-and-scan end-to-end CTest drivers
-├── third_party/     # vendored: doctest
+├── third_party/     # vendored: miniz (zip), doctest
 ├── scripts/         # build.sh, test.sh, run.sh, clean.sh
 └── docs/            # Thesis.md, SignatureDbFormat.md
 ```

@@ -11,6 +11,7 @@ namespace aav {
 /// Configuration for IEngine::Init. Plain data (no std:: types) so the SDK ABI
 /// is stable across compilers and stdlib versions.
 struct EngineConfig {
+  int scan_apk = 1;      ///< scan APK (zip) containers
   int scan_dex = 1;      ///< scan DEX files
   int recurse_dirs = 1;  ///< when a directory is scanned, descend into it
   int verbose = 0;       ///< emit engine diagnostics (stderr / logcat)
@@ -39,7 +40,8 @@ struct ScanReport {
 using ScanCallback = void (*)(const ScanReport* report, void* user_data);
 
 /// High-level scanning facade. It hides file identification, signature-database
-/// loading, scanner selection and directory traversal. Only PODs, C strings and
+/// loading, scanner selection, APK unpacking and directory traversal. Only
+/// PODs, C strings and
 /// a function pointer cross this boundary, so it is ABI-stable.
 class IEngine : public IObject {
  public:
@@ -48,12 +50,13 @@ class IEngine : public IObject {
   virtual int Init(const char* sig_db_path, const EngineConfig* config) = 0;
 
   /// Scan a single file or a directory (walked recursively when recurse_dirs is
-  /// set), invoking `cb` once per scanned *.dex. `user_data` is forwarded
-  /// unchanged to every `cb` call (see ScanCallback). Returns 0 on success.
+  /// set), invoking `cb` once per scanned *.apk / *.dex (APKs are unpacked and
+  /// their classes.dex scanned). `user_data` is forwarded unchanged to every
+  /// `cb` call (see ScanCallback). Returns 0 on success.
   virtual int Scan(const char* path, ScanCallback cb, void* user_data) = 0;
 
-  /// Scan an in-memory image with no file on disk -- useful for gateway
-  /// scanning. `name` only labels the report (may be null). `cb` is invoked
+  /// Scan an in-memory image (APK/zip or DEX, auto-detected) with no file on
+  /// disk -- useful for gateway scanning. `name` only labels the report (may be null). `cb` is invoked
   /// once with `user_data` forwarded through (see ScanCallback). Returns 0 on
   /// success.
   virtual int ScanBuffer(const void* data, size_t size, const char* name,

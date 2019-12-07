@@ -17,10 +17,11 @@ add_executable(aav_unit_tests
   unit/test_platform.cc
   unit/test_detection.cc
   unit/test_sigmgr.cc
+  unit/test_apkscanner.cc
   unit/test_engine.cc)
 # White-box tests drive internal components directly: aav_internal supplies the
-# internal header paths, sigtool_sample the shared DB/DEX fixtures (and
-# transitively the engine and zlib).
+# internal header paths, sigtool_sample the shared DB/DEX/APK fixtures (and
+# transitively the engine, zlib and AAV_HAVE_MINIZ).
 aav_apply_warnings(aav_unit_tests)
 target_link_libraries(aav_unit_tests PRIVATE aav_internal sigtool_sample)
 # tests/ is the root for the suite's own headers: "unit/test_support.h".
@@ -39,4 +40,14 @@ if(TARGET sigtool AND TARGET aavscan)
     -DAAVSCAN=$<TARGET_FILE:aavscan>
     -DWORKDIR=${CMAKE_CURRENT_BINARY_DIR}/sample_e2e
     -P ${CMAKE_CURRENT_SOURCE_DIR}/e2e/scan_sample.cmake)
+endif()
+
+# Multidex e2e: an APK with classes.dex + classes2.dex must have both members
+# unpacked and scanned (requires the APK scanner's miniz support).
+if(TARGET sigtool AND TARGET aavscan AND AAV_MINIZ_AVAILABLE)
+  add_test(NAME e2e_multidex COMMAND ${CMAKE_COMMAND}
+    -DSIGTOOL=$<TARGET_FILE:sigtool>
+    -DAAVSCAN=$<TARGET_FILE:aavscan>
+    -DWORKDIR=${CMAKE_CURRENT_BINARY_DIR}/multidex_e2e
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/e2e/scan_multidex.cmake)
 endif()

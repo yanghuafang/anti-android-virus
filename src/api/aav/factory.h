@@ -27,6 +27,7 @@ ObjPtr<IFileId> MakeFileId();
 
 // Scanners.
 ObjPtr<IScanner> MakeDexScanner();
+ObjPtr<IScanner> MakeApkScanner();
 
 // Platform I/O primitives.
 ObjPtr<IFileSystem> MakeFileSystem();

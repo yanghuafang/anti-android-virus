@@ -7,8 +7,8 @@
 
 // Generators for the self-consistent sample fixtures used by both `sigtool`
 // (which writes them to disk) and the unit tests (which build them in memory):
-// a tiny DEX and its matching signature DB. Keeping them in one place
-// guarantees the tool and the tests never drift apart.
+// a tiny DEX, its matching signature DB, and an APK wrapping the DEX. Keeping
+// them in one place guarantees the tool and the tests never drift apart.
 
 namespace aav {
 namespace sample {
@@ -27,6 +27,12 @@ Bytes BuildSampleDex(const std::string& version = "035");
 // The matching signature DB (Blowfish-encrypted + gzip-compressed) the engine
 // loads. Detects both kPathSigId and kCodeSigId in the sample DEX.
 Bytes BuildSampleSig();
+
+#ifdef AAV_HAVE_MINIZ
+// An APK/zip holding `classes_dex` as classes.dex (and `classes2_dex` as
+// classes2.dex when non-empty), for scanning APKs from memory.
+Bytes BuildSampleApk(const Bytes& classes_dex, const Bytes& classes2_dex = {});
+#endif
 
 }  // namespace sample
 }  // namespace aav

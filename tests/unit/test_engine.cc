@@ -63,3 +63,26 @@ TEST_CASE("IEngine scans a DEX buffer and reports malware + name") {
   CHECK(c.name == sample::kMalwareName);
   eng->Destroy();
 }
+
+#ifdef AAV_HAVE_MINIZ
+TEST_CASE("IEngine scans an APK buffer (unpacks classes.dex)") {
+  sample::Bytes sig = sample::BuildSampleSig();
+  aav_test::TempFile tf =
+      aav_test::MakeTempFile(".sig", sig.data(), sig.size());
+
+  IEngine* eng = MakeEngine();
+  REQUIRE(eng);
+  EngineConfig cfg;
+  const std::string path = tf.Str();
+  REQUIRE(eng->Init(path.c_str(), &cfg) == 0);
+
+  sample::Bytes apk = sample::BuildSampleApk(sample::BuildSampleDex());
+  Caught c;
+  CHECK(eng->ScanBuffer(apk.data(), apk.size(), "sample.apk", OnReport, &c) ==
+        0);
+  CHECK(c.malware);
+  CHECK(c.has_path);
+  CHECK(c.has_code);
+  eng->Destroy();
+}
+#endif
