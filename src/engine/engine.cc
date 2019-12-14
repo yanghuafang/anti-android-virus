@@ -1,7 +1,10 @@
+#include <atomic>
 #include <cstring>
 #include <filesystem>
+#include <mutex>
 #include <new>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "aav/engine_interface.h"
@@ -34,6 +37,16 @@ bool EndsWith(const std::string& s, const char* suffix) {
   return s.size() >= n && 0 == s.compare(s.size() - n, n, suffix);
 }
 
+// A self-contained set of scanners sharing the engine's immutable signature
+// manager. A single-threaded scan uses the engine's own members; a
+// multi-threaded directory scan gives each worker its own set so all per-scan
+// state stays thread-local (only sig_mgr_ is shared, and only read).
+struct ScannerSet {
+  ObjPtr<IFileId> file_id;
+  ObjPtr<IScanner> apk_scanner;
+  ObjPtr<IScanner> dex_scanner;
+};
+
 class Engine : public IEngine {
  public:
   int Init(const char* sig_db_path, const EngineConfig* config) override;
@@ -42,10 +55,22 @@ class Engine : public IEngine {
                  ScanCallback cb, void* user_data) override;
 
  private:
+  // Scan one file with the supplied scanners (the engine's own, or a worker's).
+  int ScanFile(IFileId* file_id, IScanner* apk_scanner, IScanner* dex_scanner,
+               const char* path, ScanCallback cb, void* user_data);
   int ScanOne(const char* path, ScanCallback cb, void* user_data);
   void ScanDir(const char* dir, ScanCallback cb, void* user_data);
+  // Multi-threaded directory scan: collect targets, then scan them across
+  // `threads` workers, each with its own ScannerSet.
+  void ScanDirMt(const char* dir, ScanCallback cb, void* user_data,
+                 int threads);
+  // Recursively gather the .apk/.dex files under `dir` (honoring config_).
+  void CollectTargets(const char* dir, std::vector<std::string>* out);
+  // Create a fresh scanner set bound to the shared signature manager.
+  bool BuildScannerSet(ScannerSet* set);
   // Build a POD ScanReport (backed by engine-owned storage valid only for the
-  // duration of the call) and hand it to the callback.
+  // duration of the call) and hand it to the callback. Serialized across scan
+  // threads so the user callback is never invoked concurrently.
   void Emit(const char* path, const ScanResult* result, ScanCallback cb,
             void* user_data);
 
@@ -55,6 +80,7 @@ class Engine : public IEngine {
   ObjPtr<IScanner> dex_scanner_;
   ScanOption scan_option_{};
   EngineConfig config_{};
+  std::mutex emit_mutex_;  // serializes Emit() across scan threads
 };
 
 int Engine::Init(const char* sig_db_path, const EngineConfig* config) {
@@ -112,7 +138,11 @@ int Engine::Scan(const char* path, ScanCallback cb, void* user_data) {
   }
   std::error_code ec;
   if (std::filesystem::is_directory(path, ec)) {
-    ScanDir(path, cb, user_data);
+    if (config_.scan_threads > 1) {
+      ScanDirMt(path, cb, user_data, config_.scan_threads);
+    } else {
+      ScanDir(path, cb, user_data);
+    }
     return 0;
   }
   return ScanOne(path, cb, user_data);
@@ -140,8 +170,105 @@ void Engine::ScanDir(const char* dir, ScanCallback cb, void* user_data) {
   }
 }
 
+void Engine::CollectTargets(const char* dir, std::vector<std::string>* out) {
+  std::error_code ec;
+  std::filesystem::directory_iterator it(dir, ec);
+  const std::filesystem::directory_iterator end;
+  if (ec) {
+    return;
+  }
+  for (; it != end; it.increment(ec)) {
+    if (ec) {
+      break;
+    }
+    const std::string child = it->path().string();
+    const std::string name = it->path().filename().string();
+    if ((config_.scan_apk && EndsWith(name, ".apk")) ||
+        (config_.scan_dex && EndsWith(name, ".dex"))) {
+      out->push_back(child);
+    } else if (config_.recurse_dirs && it->is_directory(ec)) {
+      CollectTargets(child.c_str(), out);
+    }
+  }
+}
+
+bool Engine::BuildScannerSet(ScannerSet* set) {
+  set->file_id = MakeFileId();
+  if (!set->file_id) {
+    return false;
+  }
+  set->apk_scanner = MakeApkScanner();
+  if (!set->apk_scanner || 0 != set->apk_scanner->Init(sig_mgr_.get())) {
+    return false;
+  }
+  set->dex_scanner = MakeDexScanner();
+  return set->dex_scanner && 0 == set->dex_scanner->Init(sig_mgr_.get());
+}
+
+void Engine::ScanDirMt(const char* dir, ScanCallback cb, void* user_data,
+                       int threads) {
+  std::vector<std::string> targets;
+  CollectTargets(dir, &targets);
+  if (targets.empty()) {
+    return;
+  }
+
+  // Never spawn more workers than there are files to scan.
+  int nworkers = threads;
+  if (nworkers > static_cast<int>(targets.size())) {
+    nworkers = static_cast<int>(targets.size());
+  }
+  if (nworkers <= 1) {
+    for (const std::string& p : targets) {
+      ScanOne(p.c_str(), cb, user_data);
+    }
+    return;
+  }
+
+  // One scanner set per worker, built serially up front so that signature
+  // manager access during setup is not itself concurrent. During the scan the
+  // only shared state is the read-only signature manager.
+  std::vector<ScannerSet> sets(nworkers);
+  for (int i = 0; i < nworkers; i++) {
+    if (!BuildScannerSet(&sets[i])) {
+      AAV_LOGE("engine: failed to set up scan thread %d; scanning serially", i);
+      for (const std::string& p : targets) {
+        ScanOne(p.c_str(), cb, user_data);
+      }
+      return;
+    }
+  }
+
+  // Workers pull file indices off a shared counter (dynamic load balancing --
+  // scan cost per file varies widely).
+  std::atomic<size_t> next{0};
+  auto worker = [&](int idx) {
+    const ScannerSet& s = sets[idx];
+    for (;;) {
+      const size_t i = next.fetch_add(1, std::memory_order_relaxed);
+      if (i >= targets.size()) {
+        break;
+      }
+      ScanFile(s.file_id.get(), s.apk_scanner.get(), s.dex_scanner.get(),
+               targets[i].c_str(), cb, user_data);
+    }
+  };
+
+  std::vector<std::thread> pool;
+  pool.reserve(nworkers);
+  for (int i = 0; i < nworkers; i++) {
+    pool.emplace_back(worker, i);
+  }
+  for (std::thread& t : pool) {
+    t.join();
+  }
+}
+
 void Engine::Emit(const char* path, const ScanResult* result, ScanCallback cb,
                   void* user_data) {
+  // Serialize so the user callback is never invoked concurrently, and so the
+  // shared signature-manager name lookups below run one at a time.
+  std::lock_guard<std::mutex> lock(emit_mutex_);
   // Storage that backs the POD ScanReport; alive until cb returns.
   std::vector<uint32_t> ids;
   std::vector<std::string> name_storage;
@@ -178,7 +305,9 @@ void Engine::Emit(const char* path, const ScanResult* result, ScanCallback cb,
   cb(&report, user_data);
 }
 
-int Engine::ScanOne(const char* path, ScanCallback cb, void* user_data) {
+int Engine::ScanFile(IFileId* file_id, IScanner* apk_scanner,
+                     IScanner* dex_scanner, const char* path, ScanCallback cb,
+                     void* user_data) {
   FileSource source{};
   source.mode = 0;
   source.name = BaseName(path);
@@ -191,7 +320,7 @@ int Engine::ScanOne(const char* path, ScanCallback cb, void* user_data) {
   }
 
   FileType type = kFileTypeUnknown;
-  if (0 != file_id_->GetFileType(stream.get(), &type)) {
+  if (0 != file_id->GetFileType(stream.get(), &type)) {
     AAV_LOGD("engine: unknown file type %s", path);
     return -1;
   }
@@ -202,7 +331,7 @@ int Engine::ScanOne(const char* path, ScanCallback cb, void* user_data) {
       return 0;
     }
     // The APK scanner locates classes.dex and runs the DEX detection.
-    if (0 != apk_scanner_->ScanStream(stream.get(), &scan_option_, result)) {
+    if (0 != apk_scanner->ScanStream(stream.get(), &scan_option_, result)) {
       AAV_LOGE("engine: apk scan failed %s", path);
       return -1;
     }
@@ -214,7 +343,7 @@ int Engine::ScanOne(const char* path, ScanCallback cb, void* user_data) {
     if (!target || 0 != target->Init(&source)) {
       return -1;
     }
-    if (0 != dex_scanner_->ScanTarget(target.get(), &scan_option_, result)) {
+    if (0 != dex_scanner->ScanTarget(target.get(), &scan_option_, result)) {
       AAV_LOGE("engine: dex scan failed %s", path);
       return -1;
     }
@@ -227,6 +356,11 @@ int Engine::ScanOne(const char* path, ScanCallback cb, void* user_data) {
   return 0;
 }
 
+int Engine::ScanOne(const char* path, ScanCallback cb, void* user_data) {
+  return ScanFile(file_id_.get(), apk_scanner_.get(), dex_scanner_.get(), path,
+                  cb, user_data);
+}
+
 int Engine::ScanBuffer(const void* data, size_t size, const char* name,
                        ScanCallback cb, void* user_data) {
   if (nullptr == data || 0 == size || nullptr == cb || !sig_mgr_) {
@@ -234,8 +368,8 @@ int Engine::ScanBuffer(const void* data, size_t size, const char* name,
   }
   const char* label = (name && name[0]) ? name : "<memory>";
 
-  // Wrap the buffer in a MemStream for identification -- the in-memory
-  // counterpart of the file path.
+  // Wrap the buffer in a MemStream for identification (and, for an APK, the
+  // stream-based scan) -- the in-memory counterpart of the file path.
   MemSource stream_src{};
   stream_src.mode = 0;  // O_RDONLY
   stream_src.name = label;

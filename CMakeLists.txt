@@ -52,6 +52,7 @@ endfunction()
 # inside its encryption.
 # ---------------------------------------------------------------------------
 find_package(ZLIB REQUIRED)
+find_package(Threads REQUIRED)
 
 # ---------------------------------------------------------------------------
 # Optional APK (zip) support via miniz. miniz is compiled straight into the

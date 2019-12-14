@@ -2,13 +2,18 @@
 // consumer of the public facade (aav/engine_interface.h) -- init, scan (results
 // arrive through a callback), print.
 
+#include <cerrno>
 #include <chrono>
+#include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 #include "aav/engine_interface.h"
 
 namespace {
+
+constexpr int kMaxScanThreads = 1024;
 
 // Per-scan state, threaded through Scan()'s opaque `user` pointer and updated
 // in the callback -- the plain function-pointer callback carries no state
@@ -47,6 +52,23 @@ int main(int argc, char** argv) {
   for (int i = 1; i < argc; i++) {
     if (0 == std::strcmp(argv[i], "--debug")) {
       config.verbose = 1;
+    } else if (0 == std::strcmp(argv[i], "--mt")) {
+      if (i + 1 >= argc) {
+        std::fprintf(stderr, "aavscan: --mt requires a thread count\n");
+        return 2;
+      }
+      // strtol, not atoi: atoi cannot distinguish "0" from unparseable
+      // input, so `--mt abc` silently became 1 thread.
+      char* end = nullptr;
+      errno = 0;
+      const int64_t t = std::strtol(argv[++i], &end, 10);
+      if (errno != 0 || end == argv[i] || *end != '\0' || t < 1 ||
+          t > kMaxScanThreads) {
+        std::fprintf(stderr, "aavscan: --mt wants 1..%d, got '%s'\n",
+                     kMaxScanThreads, argv[i]);
+        return 2;
+      }
+      config.scan_threads = static_cast<int>(t);
     } else if (nullptr == sig_path) {
       sig_path = argv[i];
     } else if (nullptr == target_path) {
@@ -54,9 +76,9 @@ int main(int argc, char** argv) {
     }
   }
   if (nullptr == sig_path || nullptr == target_path) {
-    std::fprintf(
-        stderr,
-        "usage: aavscan [--debug] <signature-db> <apk|dex file or dir>\n");
+    std::fprintf(stderr,
+                 "usage: aavscan [--debug] [--mt <threads>] "
+                 "<signature-db> <apk|dex file or dir>\n");
     return 2;
   }
 

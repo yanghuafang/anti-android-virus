@@ -87,6 +87,11 @@ scanned 1 file(s), 1 flagged, 0.000s
 
 `scripts/run.sh` is those three steps in one command.
 
+`aavscan` also takes a directory and walks it, scanning every `*.apk` / `*.dex`
+it finds. `--mt <threads>` spreads that walk across worker threads; a single
+file is always scanned on the calling thread, and reports still arrive one at a
+time, so the output matches a sequential scan apart from ordering.
+
 `sigtool` exists because a detection engine is untestable without detection
 data, and a real malware database cannot be checked into a public repository.
 It synthesizes a DEX and the signature database that matches it, from one
@@ -116,7 +121,8 @@ static void on_report(const aav::ScanReport* r, void* user) {
 }
 
 aav::IEngine* engine = aav::MakeEngine();
-aav::EngineConfig config;   // scan_apk / scan_dex / recurse_dirs / verbose
+aav::EngineConfig config;   // scan_apk / scan_dex / recurse_dirs / verbose /
+                            // scan_threads (>1 parallelizes dir scans)
 engine->Init("samples/sample.sig", &config);
 engine->Scan("path/to/file-or-dir", on_report, nullptr);
 // ...or scan an image already in RAM, with no file on disk:
@@ -128,7 +134,7 @@ engine->Destroy();          // release the engine (never `delete` it)
 `aavscan` is that snippet with argument parsing and printing around it:
 
 ```
-aavscan [--debug] <signature-db> <apk|dex file or dir>
+aavscan [--debug] [--mt <threads>] <signature-db> <apk|dex file or dir>
 ```
 
 ## Scanning an APK

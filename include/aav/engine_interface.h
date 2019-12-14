@@ -15,6 +15,8 @@ struct EngineConfig {
   int scan_dex = 1;      ///< scan DEX files
   int recurse_dirs = 1;  ///< when a directory is scanned, descend into it
   int verbose = 0;       ///< emit engine diagnostics (stderr / logcat)
+  int scan_threads = 1;  ///< worker threads for directory scans (1 =
+                         ///< sequential; only directory scans are parallelized)
 };
 
 /// One scanned file's result. All pointers are engine-owned and valid only for

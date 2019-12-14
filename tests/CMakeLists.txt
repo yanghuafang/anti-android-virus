@@ -65,3 +65,14 @@ if(TARGET sigtool AND TARGET aavscan AND AAV_MINIZ_AVAILABLE)
     -DWORKDIR=${CMAKE_CURRENT_BINARY_DIR}/multidex_e2e
     -P ${CMAKE_CURRENT_SOURCE_DIR}/e2e/scan_multidex.cmake)
 endif()
+
+# Directory + multi-threaded e2e: aavscan --mt walks a directory of DEX files
+# across worker threads. Exercises directory traversal, per-worker scanner sets,
+# the atomic work queue, and serialized callbacks.
+if(TARGET sigtool AND TARGET aavscan)
+  add_test(NAME e2e_multithread COMMAND ${CMAKE_COMMAND}
+    -DSIGTOOL=$<TARGET_FILE:sigtool>
+    -DAAVSCAN=$<TARGET_FILE:aavscan>
+    -DWORKDIR=${CMAKE_CURRENT_BINARY_DIR}/mt_e2e
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/e2e/scan_dir.cmake)
+endif()

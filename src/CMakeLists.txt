@@ -62,7 +62,7 @@ target_compile_features(aav PUBLIC cxx_std_17)
 target_include_directories(aav PUBLIC ${PROJECT_SOURCE_DIR}/include)
 aav_apply_warnings(aav)
 target_link_libraries(aav
-  PUBLIC ZLIB::ZLIB ${CMAKE_DL_LIBS}
+  PUBLIC ZLIB::ZLIB Threads::Threads ${CMAKE_DL_LIBS}
   PRIVATE aav_internal)
 if(ANDROID)
   # log.cc uses __android_log_vprint from liblog.
