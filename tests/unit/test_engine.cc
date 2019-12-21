@@ -7,9 +7,11 @@
 #include "unit/test_support.h"
 
 namespace sample = aav::sample;
+using aav::ClassFeature;
 using aav::EngineConfig;
 using aav::IEngine;
 using aav::MakeEngine;
+using aav::MethodFeature;
 using aav::ScanReport;
 
 namespace {
@@ -61,6 +63,61 @@ TEST_CASE("IEngine scans a DEX buffer and reports malware + name") {
   CHECK(c.has_path);
   CHECK(c.has_code);
   CHECK(c.name == sample::kMalwareName);
+  eng->Destroy();
+}
+
+// Exercises the hierarchical --analysis report end to end on the sample DEX:
+// two classes, Worker's static + instance fields, its direct work() and its
+// virtual run(I)V (with one parameter).
+TEST_CASE("IEngine --analysis reports classes, fields, and method protos") {
+  sample::Bytes sig = sample::BuildSampleSig();
+  aav_test::TempFile tf =
+      aav_test::MakeTempFile(".sig", sig.data(), sig.size());
+
+  IEngine* eng = MakeEngine();
+  REQUIRE(eng);
+  EngineConfig cfg;
+  cfg.analysis = 1;
+  const std::string path = tf.Str();
+  REQUIRE(eng->Init(path.c_str(), &cfg) == 0);
+
+  struct Analysis {
+    size_t class_count = 0;
+    bool static_field = false;
+    bool instance_field = false;
+    bool direct_work = false;
+    bool virtual_run_with_param = false;
+  } a;
+
+  auto cb = [](const ScanReport* r, void* user) {
+    Analysis* out = static_cast<Analysis*>(user);
+    out->class_count = r->class_count;
+    for (size_t i = 0; i < r->class_count; ++i) {
+      const ClassFeature& c = r->classes[i];
+      for (size_t f = 0; f < c.field_count; ++f) {
+        (c.fields[f].is_static ? out->static_field : out->instance_field) =
+            true;
+      }
+      for (size_t m = 0; m < c.method_count; ++m) {
+        const MethodFeature& mf = c.methods[m];
+        const std::string name = mf.method_name ? mf.method_name : "";
+        if (name == "work" && mf.is_direct) {
+          out->direct_work = true;
+        }
+        if (name == "run" && !mf.is_direct && mf.param_count == 1) {
+          out->virtual_run_with_param = true;
+        }
+      }
+    }
+  };
+
+  sample::Bytes dex = sample::BuildSampleDex();
+  CHECK(eng->ScanBuffer(dex.data(), dex.size(), "sample.dex", cb, &a) == 0);
+  CHECK(a.class_count == 2);
+  CHECK(a.static_field);
+  CHECK(a.instance_field);
+  CHECK(a.direct_work);
+  CHECK(a.virtual_run_with_param);
   eng->Destroy();
 }
 

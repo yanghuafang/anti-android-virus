@@ -22,7 +22,8 @@
 #include "aav/scan_result.h"
 #include "aav/scanner_interface.h"
 #include "aav/sig_mgr_interface.h"
-#include "utils/log.h"  // internal: runtime log level
+#include "dex/dex_analysis.h"  // internal: --analysis toggle
+#include "utils/log.h"         // internal: runtime log level
 
 namespace aav {
 namespace {
@@ -91,6 +92,7 @@ int Engine::Init(const char* sig_db_path, const EngineConfig* config) {
     config_ = *config;  // otherwise keep the defaults
   }
   SetLogLevel(config_.verbose ? kLogDebug : kLogError);
+  SetDexAnalysisEnabled(config_.analysis != 0);
 
   file_id_ = MakeFileId();
   if (!file_id_) {
@@ -273,6 +275,13 @@ void Engine::Emit(const char* path, const ScanResult* result, ScanCallback cb,
   std::vector<uint32_t> ids;
   std::vector<std::string> name_storage;
   std::vector<const char*> name_ptrs;
+  // Backing storage for the hierarchical analysis view. Each is reserved to its
+  // exact total below so it never reallocates -- the interior ClassFeature /
+  // MethodFeature pointers into these arrays stay valid until cb returns.
+  std::vector<ClassFeature> class_feats;
+  std::vector<FieldFeature> field_feats;
+  std::vector<MethodFeature> method_feats;
+  std::vector<const char*> ptr_pool;
 
   ScanReport report;
   std::memset(&report, 0, sizeof(report));
@@ -300,6 +309,79 @@ void Engine::Emit(const char* path, const ScanResult* result, ScanCallback cb,
     report.sig_ids = ids.empty() ? nullptr : ids.data();
     report.names = name_ptrs.empty() ? nullptr : name_ptrs.data();
     report.sig_count = ids.size();
+  }
+
+  if (config_.analysis) {
+    const DexAnalysisReport& analysis = GetDexAnalysisReport();
+
+    // Pre-count so every backing vector is reserved exactly once; without this
+    // a realloc would dangle the interior pointers handed out below.
+    size_t total_fields = 0, total_methods = 0, total_ptrs = 0;
+    for (const DexAnalysisClass& c : analysis.classes) {
+      total_fields += c.fields.size();
+      total_methods += c.methods.size();
+      for (const DexAnalysisMethod& m : c.methods) {
+        total_ptrs += m.params.size() + m.strings.size();
+      }
+    }
+    class_feats.reserve(analysis.classes.size());
+    field_feats.reserve(total_fields);
+    method_feats.reserve(total_methods);
+    ptr_pool.reserve(total_ptrs);
+
+    for (const DexAnalysisClass& c : analysis.classes) {
+      const size_t field_begin = field_feats.size();
+      for (const DexAnalysisField& fld : c.fields) {
+        FieldFeature ff;
+        std::memset(&ff, 0, sizeof(ff));
+        ff.name = fld.name.c_str();
+        ff.type = fld.type.c_str();
+        ff.is_static = fld.is_static ? 1 : 0;
+        field_feats.push_back(ff);
+      }
+
+      const size_t method_begin = method_feats.size();
+      for (const DexAnalysisMethod& m : c.methods) {
+        const size_t param_begin = ptr_pool.size();
+        for (const std::string& p : m.params) {
+          ptr_pool.push_back(p.c_str());
+        }
+        const size_t str_begin = ptr_pool.size();
+        for (const std::string& s : m.strings) {
+          ptr_pool.push_back(s.c_str());
+        }
+
+        MethodFeature f;
+        std::memset(&f, 0, sizeof(f));
+        f.method_name = m.method_name.c_str();
+        f.return_type = m.return_type.c_str();
+        f.params = m.params.empty() ? nullptr : &ptr_pool[param_begin];
+        f.param_count = m.params.size();
+        f.is_direct = m.is_direct ? 1 : 0;
+        f.known = m.known ? 1 : 0;
+        f.has_opcode_crc = m.has_opcode_crc ? 1 : 0;
+        f.opcode_crc = m.opcode_crc;
+        f.has_operand_crc = m.has_operand_crc ? 1 : 0;
+        f.operand_crc = m.operand_crc;
+        f.strings = m.strings.empty() ? nullptr : &ptr_pool[str_begin];
+        f.string_count = m.strings.size();
+        method_feats.push_back(f);
+      }
+
+      ClassFeature cf;
+      std::memset(&cf, 0, sizeof(cf));
+      cf.class_path = c.class_path.c_str();
+      cf.super_class = c.super_class.c_str();
+      cf.source_file = c.source_file.c_str();
+      cf.fields = c.fields.empty() ? nullptr : &field_feats[field_begin];
+      cf.field_count = c.fields.size();
+      cf.methods = c.methods.empty() ? nullptr : &method_feats[method_begin];
+      cf.method_count = c.methods.size();
+      class_feats.push_back(cf);
+    }
+
+    report.classes = class_feats.empty() ? nullptr : class_feats.data();
+    report.class_count = class_feats.size();
   }
 
   cb(&report, user_data);

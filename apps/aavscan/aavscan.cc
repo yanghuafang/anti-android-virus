@@ -23,6 +23,52 @@ struct ScanStats {
   int flagged = 0;
 };
 
+void PrintMethod(const aav::MethodFeature& m) {
+  std::printf("      %smethod %s(", m.is_direct ? "" : "virtual ",
+              m.method_name ? m.method_name : "");
+  for (size_t p = 0; p < m.param_count; p++) {
+    std::printf("%s%s", p ? ", " : "", m.params[p]);
+  }
+  std::printf(")%s%s\n", m.return_type ? m.return_type : "",
+              m.known ? "  [known]" : "");
+  if (m.has_opcode_crc) {
+    std::printf("        opcodeCRC32:  0x%08x\n", m.opcode_crc);
+  }
+  if (m.has_operand_crc) {
+    std::printf("        operandCRC32: 0x%08x\n", m.operand_crc);
+  }
+  for (size_t j = 0; j < m.string_count; j++) {
+    std::printf("          \"%s\"\n", m.strings[j]);
+  }
+}
+
+void PrintAnalysis(const aav::ScanReport& report) {
+  if (0 == report.class_count) {
+    return;
+  }
+  std::printf("  analysis: %zu class(es)\n", report.class_count);
+  for (size_t i = 0; i < report.class_count; i++) {
+    const aav::ClassFeature& c = report.classes[i];
+    std::printf("    class %s", c.class_path ? c.class_path : "");
+    if (c.super_class && c.super_class[0]) {
+      std::printf(" : %s", c.super_class);
+    }
+    if (c.source_file && c.source_file[0]) {
+      std::printf("  (%s)", c.source_file);
+    }
+    std::printf("\n");
+    for (size_t f = 0; f < c.field_count; f++) {
+      std::printf("      %sfield %s : %s\n",
+                  c.fields[f].is_static ? "static " : "",
+                  c.fields[f].name ? c.fields[f].name : "",
+                  c.fields[f].type ? c.fields[f].type : "");
+    }
+    for (size_t m = 0; m < c.method_count; m++) {
+      PrintMethod(c.methods[m]);
+    }
+  }
+}
+
 // aav::ScanCallback: invoked once per scanned file; `user_data` is the
 // ScanStats we passed to Scan().
 void OnReport(const aav::ScanReport* report, void* user_data) {
@@ -41,6 +87,7 @@ void OnReport(const aav::ScanReport* report, void* user_data) {
     }
     std::printf("\n");
   }
+  PrintAnalysis(*report);
 }
 
 }  // namespace
@@ -52,6 +99,8 @@ int main(int argc, char** argv) {
   for (int i = 1; i < argc; i++) {
     if (0 == std::strcmp(argv[i], "--debug")) {
       config.verbose = 1;
+    } else if (0 == std::strcmp(argv[i], "--analysis")) {
+      config.analysis = 1;
     } else if (0 == std::strcmp(argv[i], "--mt")) {
       if (i + 1 >= argc) {
         std::fprintf(stderr, "aavscan: --mt requires a thread count\n");
@@ -77,7 +126,7 @@ int main(int argc, char** argv) {
   }
   if (nullptr == sig_path || nullptr == target_path) {
     std::fprintf(stderr,
-                 "usage: aavscan [--debug] [--mt <threads>] "
+                 "usage: aavscan [--debug] [--analysis] [--mt <threads>] "
                  "<signature-db> <apk|dex file or dir>\n");
     return 2;
   }

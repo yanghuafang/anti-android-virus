@@ -87,6 +87,13 @@ scanned 1 file(s), 1 flagged, 0.000s
 
 `scripts/run.sh` is those three steps in one command.
 
+`--analysis` prints, after the scan, every class the parser saw with its fields
+and every method with its opcode/operand CRC32s and referenced strings. That is
+the data a new signature is written from — see
+[`docs/Signatures.md`](docs/Signatures.md). It is off by default because it
+records every method, which means bypassing the bitmap pre-filter that makes a
+normal scan fast.
+
 `aavscan` also takes a directory and walks it, scanning every `*.apk` / `*.dex`
 it finds. `--mt <threads>` spreads that walk across worker threads; a single
 file is always scanned on the calling thread, and reports still arrive one at a
@@ -115,14 +122,15 @@ all sit behind it:
 
 static void on_report(const aav::ScanReport* r, void* user) {
   if (r->is_malware) {
-    // r->path, r->sig_ids[0..sig_count), r->names[...] -- all engine-owned,
-    // valid only during this call.
+    // r->path, r->sig_ids[0..sig_count), r->names[...], and r->classes[...]
+    // when analysis is enabled -- all engine-owned, valid only during this
+    // call.
   }
 }
 
 aav::IEngine* engine = aav::MakeEngine();
 aav::EngineConfig config;   // scan_apk / scan_dex / recurse_dirs / verbose /
-                            // scan_threads (>1 parallelizes dir scans)
+                            // analysis / scan_threads (>1 parallelizes dirs)
 engine->Init("samples/sample.sig", &config);
 engine->Scan("path/to/file-or-dir", on_report, nullptr);
 // ...or scan an image already in RAM, with no file on disk:
@@ -134,7 +142,7 @@ engine->Destroy();          // release the engine (never `delete` it)
 `aavscan` is that snippet with argument parsing and printing around it:
 
 ```
-aavscan [--debug] [--mt <threads>] <signature-db> <apk|dex file or dir>
+aavscan [--debug] [--analysis] [--mt <threads>] <signature-db> <apk|dex file or dir>
 ```
 
 ## Scanning an APK
@@ -274,7 +282,7 @@ ctest --preset debug
 │   └── e2e/         # generate-and-scan end-to-end CTest drivers
 ├── third_party/     # vendored: miniz (zip), doctest
 ├── scripts/         # build.sh, test.sh, run.sh, clean.sh
-└── docs/            # Thesis.md, SignatureDbFormat.md
+└── docs/            # Thesis.md, Signatures.md, SignatureDbFormat.md
 ```
 
 ## Why CRC32 and LEB128 first

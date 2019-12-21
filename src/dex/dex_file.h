@@ -65,7 +65,7 @@ class DexFile {
   int GetMethodInfo(uint32_t index, MethodInfo& method_info);
   int GetClassInfo(uint32_t index, ClassInfo& class_info);
 
-  // Info for the class most recently returned by GetClass().
+  // Info for the class most recently returned by GetClass(); for --analysis.
   int GetCurrentClassInfo(ClassInfo& class_info);
   int GetCurrentClassFields(std::vector<FieldInfo>& fields);
 

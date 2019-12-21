@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "aav/target_interface.h"
+#include "dex/dex_analysis.h"
 #include "dex/dex_code.h"
 #include "dex/dex_code_scan_result_mgr.h"
 #include "dex/dex_code_sig_mgr.h"
@@ -45,11 +46,17 @@ int DexParser::Uninit() {
 }
 
 // Whole-file scan. Walk every class and apply the two matchers: a package-path
-// hit (SearchClassPath) classifies the class outright; otherwise walk its
-// direct and virtual methods, reducing each to code features via ScanMethod.
-// Path- and code-signature hits are then merged (MergeScanResult) into the
-// confirmed sig_id list.
+// hit (SearchClassPath) classifies the class outright; otherwise -- and always,
+// in analysis mode -- walk its direct and virtual methods, reducing each to
+// code features via ScanMethod. Path- and code-signature hits are then merged
+// (MergeScanResult) into the confirmed sig_id list. Analysis mode additionally
+// records a per-class feature tree instead of short-circuiting on a path hit.
 int DexParser::Scan(std::vector<uint32_t>& sig_id_array) {
+  const bool analysis = IsDexAnalysisEnabled();
+  if (analysis) {
+    MutableDexAnalysisReport().classes.clear();
+  }
+
   std::string class_name;
   DexPathScanResultMgr path_result_mgr;
   DexCodeScanResultMgr code_result_mgr;
@@ -64,14 +71,39 @@ int DexParser::Scan(std::vector<uint32_t>& sig_id_array) {
     }
     AAV_LOGD("class: %s", class_name.c_str());
 
+    // Analysis: record the class with its declared fields (and, below,
+    // methods).
+    DexAnalysisClass analysis_class;
+    if (analysis) {
+      analysis_class.class_path = class_name;
+      ClassInfo class_info;
+      if (0 == dex_file_->GetCurrentClassInfo(class_info)) {
+        analysis_class.super_class = class_info.super_class;
+        analysis_class.source_file = class_info.source_file;
+      }
+      std::vector<FieldInfo> fields;
+      if (0 == dex_file_->GetCurrentClassFields(fields)) {
+        for (const FieldInfo& fi : fields) {
+          DexAnalysisField f;
+          f.name = fi.name;
+          f.type = fi.type;
+          f.is_static = fi.is_static;
+          analysis_class.fields.push_back(f);
+        }
+      }
+    }
+
     DexPathSig* path_sig = nullptr;
     if (0 == dex_sig_mgr_->SearchClassPath(class_name.c_str(), &path_sig)) {
       if (0 != path_result_mgr.AddSigHit(path_sig)) {
         ret = -1;
         break;
       }
-      // A path hit already classifies the class; its methods add nothing.
-      continue;
+      // A path hit already classifies the class; only keep walking its methods
+      // when analysis wants every method's features recorded.
+      if (!analysis) {
+        continue;
+      }
     }
 
     std::string method_name;
@@ -83,7 +115,16 @@ int DexParser::Scan(std::vector<uint32_t>& sig_id_array) {
       if (-2 == result) {
         continue;
       }
-      ScanMethod(dex_code, code_result_mgr);
+      DexAnalysisMethod m;
+      if (analysis) {
+        m.method_name = method_name;
+      }
+      ScanMethod(dex_code, code_result_mgr, analysis, analysis ? &m : nullptr);
+      if (analysis) {
+        m.is_direct = true;
+        FillMethodProto(key, m);
+        analysis_class.methods.push_back(std::move(m));
+      }
     }
 
     key = 0;
@@ -92,7 +133,20 @@ int DexParser::Scan(std::vector<uint32_t>& sig_id_array) {
       if (-2 == result) {
         continue;
       }
-      ScanMethod(dex_code, code_result_mgr);
+      DexAnalysisMethod m;
+      if (analysis) {
+        m.method_name = method_name;
+      }
+      ScanMethod(dex_code, code_result_mgr, analysis, analysis ? &m : nullptr);
+      if (analysis) {
+        m.is_direct = false;
+        FillMethodProto(key, m);
+        analysis_class.methods.push_back(std::move(m));
+      }
+    }
+
+    if (analysis) {
+      MutableDexAnalysisReport().classes.push_back(std::move(analysis_class));
     }
   }
 
@@ -138,15 +192,17 @@ int DexParser::RegularizeClassName(std::string& class_name) {
 }
 
 int DexParser::ScanMethod(DexCode& dex_code,
-                          DexCodeScanResultMgr& code_result_mgr) {
+                          DexCodeScanResultMgr& code_result_mgr, bool analysis,
+                          DexAnalysisMethod* out) {
   FastOpcodes fast_opcodes;
   if (0 != dex_code.GetFastOpcodes(fast_opcodes)) {
     return -1;
   }
 
-  // Fast opcode-bitmap pre-filter: skip methods that cannot match any
-  // signature before paying for their CRCs.
-  if (0 != dex_sig_mgr_->SearchOpcodeMap(&fast_opcodes)) {
+  // Fast opcode-bitmap pre-filter: in normal scans, skip methods that cannot
+  // match any signature. In analysis mode every method is recorded, so the
+  // pre-filter is bypassed.
+  if (!analysis && 0 != dex_sig_mgr_->SearchOpcodeMap(&fast_opcodes)) {
     return -1;
   }
 
@@ -157,9 +213,11 @@ int DexParser::ScanMethod(DexCode& dex_code,
   DexCodeCrc code_crc;
   GetCodeCrc(dex_code, code_crc);
 
+  bool known = false;
   if (code_crc.has_opcode) {
     DexCodeCrcSig* opcode_sig = nullptr;
     if (0 == dex_sig_mgr_->SearchOpcodeCrc(code_crc.opcode_crc, &opcode_sig)) {
+      known = true;
       if (0 != code_result_mgr.AddSigHit(opcode_sig)) {
         return -1;
       }
@@ -170,12 +228,30 @@ int DexParser::ScanMethod(DexCode& dex_code,
     DexCodeCrcSig* operand_sig = nullptr;
     if (0 == dex_sig_mgr_->SearchOperandCrc(code_crc.operand_str_crc,
                                             &operand_sig)) {
+      known = true;
       if (0 != code_result_mgr.AddSigHit(operand_sig)) {
         return -1;
       }
     }
   }
+
+  if (analysis && nullptr != out) {
+    out->known = known;
+    out->has_opcode_crc = code_crc.has_opcode;
+    out->opcode_crc = code_crc.opcode_crc;
+    out->has_operand_crc = code_crc.has_operand_str;
+    out->operand_crc = code_crc.operand_str_crc;
+    dex_code.GetOperandStrings(out->strings);
+  }
   return 0;
+}
+
+void DexParser::FillMethodProto(uint32_t method_index, DexAnalysisMethod& out) {
+  MethodInfo method_info;
+  if (0 == dex_file_->GetMethodInfo(method_index, method_info)) {
+    out.return_type = method_info.proto_info.return_type;
+    out.params = method_info.proto_info.parameters;
+  }
 }
 
 int DexParser::GetCodeCrc(DexCode& dex_code, DexCodeCrc& code_crc) {

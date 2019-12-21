@@ -10,6 +10,7 @@
 #include "aav/mem_target_interface.h"
 #include "aav/object_interface.h"
 #include "aav/object_ptr.h"
+#include "dex/dex_analysis.h"  // SetDexAnalysisEnabled
 #include "dex/dex_code.h"
 #include "dex/dex_code_sig_mgr.h"  // FastOpcodes
 #include "dex/dex_file.h"
@@ -22,9 +23,11 @@ using aav::DexFile;
 using aav::FastOpcodes;
 using aav::FieldInfo;
 using aav::IMemTarget;
+using aav::IsDexAnalysisEnabled;
 using aav::MemSource;
 using aav::MethodInfo;
 using aav::ProtoInfo;
+using aav::SetDexAnalysisEnabled;
 
 // Drive the DEX parser over a buffer. It must never read out of bounds — this
 // is asserted hard by the `asan` build (ASan/UBSan). Here we just require that
@@ -45,6 +48,10 @@ static void DriveDex(std::vector<uint8_t>& buf) {
   if (0 == target->Init(&src)) {
     DexFile df;
     if (0 == df.Init(target.get())) {
+      // Enable analysis so the index-based info accessors (GetProtoInfo etc.)
+      // run on this input; their bounds are ASan-checked here.
+      const bool prev = IsDexAnalysisEnabled();
+      SetDexAnalysisEnabled(true);
       std::string cls;
       int r = 0;
       int guard = 0;
@@ -97,6 +104,7 @@ static void DriveDex(std::vector<uint8_t>& buf) {
         ClassInfo ci;
         df.GetClassInfo(idx, ci);
       }
+      SetDexAnalysisEnabled(prev);
     }
   }
 }

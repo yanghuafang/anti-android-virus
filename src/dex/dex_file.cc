@@ -6,6 +6,7 @@
 #include <new>
 
 #include "aav/target_interface.h"
+#include "dex/dex_analysis.h"
 #include "dex/dex_code.h"
 #include "utils/leb128.h"
 #include "utils/log.h"
@@ -131,8 +132,8 @@ bool DexFile::RegionOk(uint32_t off, uint32_t count, uint32_t item_size) const {
 // iterators that GetDirectMethod/GetVirtualMethod consume. Returns 0 on success
 // (class_name set), -2 to skip a malformed or data-less class (the caller
 // advances and continues), or -1 to stop iterating (end of the class list, or a
-// fatal allocation error). Both the field lists and the method lists are
-// decoded.
+// fatal allocation error). Fields are decoded only in --analysis mode; methods
+// are always decoded.
 int DexFile::GetClass(std::string& class_name) {
   class_data_item_.reset();
 
@@ -192,11 +193,12 @@ int DexFile::GetClass(std::string& class_name) {
     if (nullptr == class_data_item_) {
       break;
     }
+    const bool analysis = IsDexAnalysisEnabled();
 
     bool success = true;
     try {
       // static_fields then instance_fields: each entry is a (field_idx_diff,
-      // access_flags) uleb pair.
+      // access_flags) uleb pair. Stored only for --analysis; skipped otherwise.
       for (uint32_t i = 0; i < static_fields_size; i++) {
         DexEncodedField f;
         if (0 !=
@@ -210,7 +212,9 @@ int DexFile::GetClass(std::string& class_name) {
           break;
         }
         cur += bytes_read;
-        class_data_item_->static_fields.push_back(f);
+        if (analysis) {
+          class_data_item_->static_fields.push_back(f);
+        }
       }
       if (!success) {
         break;
@@ -229,7 +233,9 @@ int DexFile::GetClass(std::string& class_name) {
           break;
         }
         cur += bytes_read;
-        class_data_item_->instance_fields.push_back(f);
+        if (analysis) {
+          class_data_item_->instance_fields.push_back(f);
+        }
       }
       if (!success) {
         break;

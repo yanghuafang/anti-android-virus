@@ -14,6 +14,7 @@ class DexFile;
 class DexCode;
 class DexPathScanResultMgr;
 class DexCodeScanResultMgr;
+struct DexAnalysisMethod;
 
 struct DexCodeCrc {
   bool has_opcode;
@@ -37,7 +38,10 @@ class DexParser {
 
  private:
   static int RegularizeClassName(std::string& class_name);
-  int ScanMethod(DexCode& dex_code, DexCodeScanResultMgr& code_result_mgr);
+  int ScanMethod(DexCode& dex_code, DexCodeScanResultMgr& code_result_mgr,
+                 bool analysis, DexAnalysisMethod* out);
+  // Fills out.return_type/params from the method's proto (analysis only).
+  void FillMethodProto(uint32_t method_index, DexAnalysisMethod& out);
   static int GetCodeCrc(DexCode& dex_code, DexCodeCrc& code_crc);
   int MergeScanResult(DexPathScanResultMgr& path_result_mgr,
                       DexCodeScanResultMgr& code_result_mgr,

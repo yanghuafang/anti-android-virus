@@ -404,7 +404,8 @@ declared **fields**, and per method its full **prototype** (return type and
 parameter descriptors), the opcode- and string-sequence CRC-32s, and the
 referenced constant strings — precisely the information a human uses to author a
 signature. The bundled `sigtool` generates a self-consistent sample DEX and
-signature database so the whole pipeline runs with no external assets.
+signature database so the whole pipeline runs with no external assets; see
+[Signatures.md](Signatures.md).
 
 ### 4.9 Engineering quality and portability
 

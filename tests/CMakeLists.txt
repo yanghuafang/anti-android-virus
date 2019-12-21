@@ -13,6 +13,7 @@ add_executable(aav_unit_tests
   unit/test_blowfish.cc
   unit/test_gzip.cc
   unit/test_fileid.cc
+  unit/test_dexanalysis.cc
   unit/test_log.cc
   unit/test_platform.cc
   unit/test_detection.cc
