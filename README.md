@@ -242,6 +242,7 @@ or, the same thing in one line:
 scripts/build.sh          # PRESET=release scripts/build.sh for -O2
 scripts/test.sh           # build with tests enabled, then run them
 scripts/run.sh            # generate a sample and scan it end to end
+scripts/asan.sh           # sanitizer build + tests
 scripts/clean.sh          # remove the build root
 ```
 
@@ -250,9 +251,17 @@ into the sibling `../anti-android-virus-build/`.
 
 ## Testing
 
-Two suites, both under CTest: the doctest unit tests, and an end-to-end test
-that runs `sigtool` and `aavscan` as the user does and checks that both sample
+Two suites, both under CTest: the doctest unit tests, and end-to-end tests that
+run `sigtool` and `aavscan` as the user does and check that both sample
 signatures fire.
+
+The parsers are the untrusted-input surface, so the same suites also run under
+AddressSanitizer and UndefinedBehaviorSanitizer:
+
+```bash
+scripts/asan.sh
+# or: cmake --preset asan && cmake --build --preset asan -j && ctest --preset asan
+```
 
 ```bash
 cmake --preset debug && cmake --build ../anti-android-virus-build/debug -j

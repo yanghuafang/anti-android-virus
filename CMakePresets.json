@@ -24,6 +24,17 @@
       "description": "-O2 takes different paths through the parsers than -O0, and assert() is compiled out, so this is a separate gate rather than a variant of debug.",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
     },
+    {
+      "name": "asan",
+      "inherits": "base",
+      "displayName": "Debug + ASan/UBSan",
+      "description": "AddressSanitizer and UndefinedBehaviorSanitizer over the parsers and the scan pipeline. The flags go in CMAKE_CXX_FLAGS so every C++ target in the tree is instrumented: a partly instrumented link is either a link error or a false report.",
+      "cacheVariables": {
+        "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer -g",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined",
+        "CMAKE_SHARED_LINKER_FLAGS": "-fsanitize=address,undefined"
+      }
+    },
     { "name": "debug", "inherits": "base", "configurePreset": "debug" },
     { "name": "release", "inherits": "base", "configurePreset": "release" }
   ]
