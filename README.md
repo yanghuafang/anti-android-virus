@@ -225,6 +225,7 @@ a `Destroy()` instead.
 
 - CMake ≥ 3.21
 - A C++17 compiler (GCC ≥ 9, Clang ≥ 10, or Apple Clang)
+- *(optional)* Clang with the libFuzzer + sanitizer runtimes, to build the fuzzers
 - zlib (`zlib1g-dev` on Debian/Ubuntu; preinstalled on macOS)
 
 APK/zip support (miniz) is vendored under `third_party/` — no extra dependency.
@@ -263,6 +264,18 @@ scripts/asan.sh
 # or: cmake --preset asan && cmake --build --preset asan -j && ctest --preset asan
 ```
 
+Fuzzing the DEX parser (needs a Clang toolchain with libFuzzer):
+
+```bash
+FUZZ_TIME=60 scripts/fuzz.sh          # build and run
+scripts/fuzz.sh --build-only          # just check the harness still compiles
+```
+
+A seedless run explores different input every time, so a fuzz run is a
+developer's call rather than something to gate a change on; what is worth
+keeping green is that the harness still compiles against the engine. Crashing
+inputs are written under the fuzz build tree.
+
 ```bash
 cmake --preset debug && cmake --build ../anti-android-virus-build/debug -j
 ctest --preset debug
@@ -289,6 +302,7 @@ ctest --preset debug
 ├── tests/
 │   ├── unit/        # doctest white-box unit tests (one binary)
 │   └── e2e/         # generate-and-scan end-to-end CTest drivers
+├── fuzz/            # libFuzzer harness for the DEX parser
 ├── third_party/     # vendored: miniz (zip), doctest
 ├── scripts/         # build.sh, test.sh, run.sh, clean.sh
 └── docs/            # Thesis.md, Signatures.md, SignatureDbFormat.md

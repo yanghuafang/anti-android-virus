@@ -1,9 +1,10 @@
-# 3.21 is the CMakePresets.json schema v3, which CMake reads only from 3.21.
-# Nothing else in this file needs more than 3.13, so CMakePresets.json alone
-# sets the floor. v3 is what lets a preset omit "generator" and inherit the
-# platform default; on schema v2 (3.20) that field is required, so every preset
-# would hard-code Ninja or Makefiles. Dropping presets is therefore what
-# lowering the floor would cost.
+# Two different numbers, and the larger one wins:
+#   3.13  the newest command used in this file (target_link_options)
+#   3.21  the CMakePresets.json schema, v3, which CMake reads only from 3.21
+# So the floor is 3.21 and CMakePresets.json alone sets it. v3 is what lets a
+# preset omit "generator" and inherit the platform default; on schema v2 (3.20)
+# that field is required, so every preset would hard-code Ninja or Makefiles.
+# Dropping presets is therefore what lowering the floor to 3.13 would cost.
 cmake_minimum_required(VERSION 3.21)
 
 project(anti_android_virus
@@ -14,6 +15,7 @@ project(anti_android_virus
 option(AAV_BUILD_CLI   "Build the aavscan CLI executable" ON)
 option(AAV_BUILD_TOOLS "Build sigtool (feature/DB tooling)" ON)
 option(AAV_BUILD_TESTS "Build unit tests" OFF)
+option(AAV_BUILD_FUZZERS "Build libFuzzer harnesses (clang only)" OFF)
 option(AAV_ENABLE_APK    "Enable APK (zip) scanning via miniz" ON)
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -70,8 +72,8 @@ elseif(AAV_ENABLE_APK)
 endif()
 
 # ---------------------------------------------------------------------------
-# Targets: the engine (src/) and its consumers (apps/, tests/). Each subtree
-# owns its own target definitions.
+# Targets: the engine (src/) and its consumers (apps/, tests/, fuzz/). Each
+# subtree owns its own target definitions.
 # ---------------------------------------------------------------------------
 add_subdirectory(src)
 add_subdirectory(apps)
@@ -79,6 +81,10 @@ add_subdirectory(apps)
 if(AAV_BUILD_TESTS)
   enable_testing()
   add_subdirectory(tests)
+endif()
+
+if(AAV_BUILD_FUZZERS)
+  add_subdirectory(fuzz)
 endif()
 
 message(STATUS "aav: APK/zip support (miniz): ${AAV_MINIZ_AVAILABLE}")

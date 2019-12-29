@@ -35,6 +35,30 @@
         "CMAKE_SHARED_LINKER_FLAGS": "-fsanitize=address,undefined"
       }
     },
+    {
+      "name": "fuzz",
+      "inherits": "base",
+      "displayName": "Fuzzers (clang + libFuzzer)",
+      "description": "The libFuzzer harnesses. Tests are off because nothing here runs under CTest, and sigtool is off because the harness does not use it.",
+      "cacheVariables": {
+        "AAV_BUILD_TESTS": "OFF",
+        "AAV_BUILD_FUZZERS": "ON",
+        "AAV_BUILD_TOOLS": "OFF"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "debug", "configurePreset": "debug" },
+    { "name": "release", "configurePreset": "release" },
+    { "name": "asan", "configurePreset": "asan" },
+    { "name": "fuzz", "configurePreset": "fuzz" }
+  ],
+  "testPresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "output": { "outputOnFailure": true }
+    },
     { "name": "debug", "inherits": "base", "configurePreset": "debug" },
     { "name": "release", "inherits": "base", "configurePreset": "release" }
   ]
