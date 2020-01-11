@@ -28,12 +28,7 @@
       "name": "asan",
       "inherits": "base",
       "displayName": "Debug + ASan/UBSan",
-      "description": "AddressSanitizer and UndefinedBehaviorSanitizer over the parsers and the scan pipeline. The flags go in CMAKE_CXX_FLAGS so every C++ target in the tree is instrumented: a partly instrumented link is either a link error or a false report.",
-      "cacheVariables": {
-        "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer -g",
-        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined",
-        "CMAKE_SHARED_LINKER_FLAGS": "-fsanitize=address,undefined"
-      }
+      "cacheVariables": { "AAV_ENABLE_ASAN": "ON" }
     },
     {
       "name": "fuzz",
@@ -60,6 +55,13 @@
       "output": { "outputOnFailure": true }
     },
     { "name": "debug", "inherits": "base", "configurePreset": "debug" },
-    { "name": "release", "inherits": "base", "configurePreset": "release" }
+    { "name": "release", "inherits": "base", "configurePreset": "release" },
+    {
+      "name": "asan",
+      "inherits": "base",
+      "configurePreset": "asan",
+      "description": "A UBSan report is only actionable with a stack trace, and the runtime has to be told to collect one. detect_leaks is deliberately absent: LeakSanitizer is already on by default with ASan on Linux, and setting it explicitly would abort every test on macOS, where LSan does not exist.",
+      "environment": { "UBSAN_OPTIONS": "print_stacktrace=1" }
+    }
   ]
 }

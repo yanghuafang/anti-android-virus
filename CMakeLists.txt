@@ -17,6 +17,7 @@ option(AAV_BUILD_TOOLS "Build sigtool (feature/DB tooling)" ON)
 option(AAV_BUILD_TESTS "Build unit tests" OFF)
 option(AAV_BUILD_FUZZERS "Build libFuzzer harnesses (clang only)" OFF)
 option(AAV_ENABLE_APK    "Enable APK (zip) scanning via miniz" ON)
+option(AAV_ENABLE_ASAN "Instrument with AddressSanitizer + UndefinedBehaviorSanitizer" OFF)
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
@@ -48,6 +49,30 @@ function(aav_apply_warnings tgt)
     target_compile_options(${tgt} PRIVATE /W4)
   endif()
 endfunction()
+
+# ---------------------------------------------------------------------------
+# AddressSanitizer + UndefinedBehaviorSanitizer. Global: the engine and
+# everything that drives it have to agree, since a partly instrumented link is
+# either a link error or a false report.
+#
+# Global is also what the `asan` preset could not express when it set
+# CMAKE_CXX_FLAGS by hand: that reaches C++ only, so miniz.c -- the one C file
+# in the build, and the one parsing attacker-controlled zip data -- was the
+# single translation unit ASan never covered.
+#
+# -fno-sanitize-recover=all is what makes the build worth running unattended.
+# UBSan defaults to printing a diagnostic and continuing, so an overflow left
+# the process exit status at 0 and ctest reported a pass; aborting turns a
+# finding into a failed test. ASan already aborts.
+# ---------------------------------------------------------------------------
+if(AAV_ENABLE_ASAN)
+  if(NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    message(FATAL_ERROR "AAV_ENABLE_ASAN needs GCC or Clang (have ${CMAKE_CXX_COMPILER_ID})")
+  endif()
+  add_compile_options(-fsanitize=address,undefined -fno-sanitize-recover=all
+                      -fno-omit-frame-pointer -g)
+  add_link_options(-fsanitize=address,undefined)
+endif()
 
 # ---------------------------------------------------------------------------
 # Dependencies. zlib inflates the signature database, which is gzip-compressed
@@ -89,3 +114,4 @@ endif()
 
 message(STATUS "aav: APK/zip support (miniz): ${AAV_MINIZ_AVAILABLE}")
 message(STATUS "aav: build tools: ${AAV_BUILD_TOOLS}  tests: ${AAV_BUILD_TESTS}")
+message(STATUS "aav: asan+ubsan: ${AAV_ENABLE_ASAN}")

@@ -3,10 +3,13 @@
 #
 #   scripts/asan.sh [extra cmake configure args...]
 #
-# Everything this needs is in the asan presets: the sanitizer flags,
-# AAV_BUILD_TESTS, and the UBSAN_OPTIONS the runtime needs to print a usable
-# report. So `cmake --preset asan && ctest --preset asan` is this script, and a
-# failure reproduces without reading this file.
+# Everything this needs is in the asan presets: the flags behind AAV_ENABLE_ASAN
+# in CMakeLists.txt, AAV_BUILD_TESTS, and the UBSAN_OPTIONS the runtime needs to
+# print a usable report. So `cmake --preset asan && ctest --preset asan` is this
+# script, and a failure reproduces without reading this file.
+#
+# UBSan findings abort rather than print (-fno-sanitize-recover=all), so a
+# finding here is a failed test rather than a line in the log.
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 
 require cmake
