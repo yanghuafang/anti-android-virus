@@ -18,6 +18,7 @@ option(AAV_BUILD_TESTS "Build unit tests" OFF)
 option(AAV_BUILD_FUZZERS "Build libFuzzer harnesses (clang only)" OFF)
 option(AAV_ENABLE_APK    "Enable APK (zip) scanning via miniz" ON)
 option(AAV_ENABLE_ASAN "Instrument with AddressSanitizer + UndefinedBehaviorSanitizer" OFF)
+option(AAV_ENABLE_TSAN "Instrument with ThreadSanitizer" OFF)
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
@@ -69,9 +70,35 @@ if(AAV_ENABLE_ASAN)
   if(NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     message(FATAL_ERROR "AAV_ENABLE_ASAN needs GCC or Clang (have ${CMAKE_CXX_COMPILER_ID})")
   endif()
+  if(AAV_ENABLE_TSAN)
+    message(FATAL_ERROR "AAV_ENABLE_ASAN and AAV_ENABLE_TSAN cannot both be on: "
+                        "the two runtimes cannot be linked into one binary. Use "
+                        "the asan and tsan presets separately.")
+  endif()
   add_compile_options(-fsanitize=address,undefined -fno-sanitize-recover=all
                       -fno-omit-frame-pointer -g)
   add_link_options(-fsanitize=address,undefined)
+endif()
+
+# ---------------------------------------------------------------------------
+# ThreadSanitizer, for the scan thread pool in src/engine/engine.cc. Global for
+# the same reason ASan is: TSan only sees a race if both sides of it were
+# instrumented, and the engine and the tests that drive it are separate targets.
+#
+# Its own option rather than a mode of AAV_ENABLE_ASAN because the two runtimes
+# are mutually exclusive at link time -- hence the guard above.
+#
+# There is no -fno-sanitize-recover=all here, unlike ASan/UBSan: TSan is not one
+# of the sanitizers that flag reaches. A race is reported and the process keeps
+# going, so the abort has to come from TSAN_OPTIONS=halt_on_error=1, which the
+# tsan test preset sets.
+# ---------------------------------------------------------------------------
+if(AAV_ENABLE_TSAN)
+  if(NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    message(FATAL_ERROR "AAV_ENABLE_TSAN needs GCC or Clang (have ${CMAKE_CXX_COMPILER_ID})")
+  endif()
+  add_compile_options(-fsanitize=thread -fno-omit-frame-pointer -g)
+  add_link_options(-fsanitize=thread)
 endif()
 
 # ---------------------------------------------------------------------------
@@ -114,4 +141,4 @@ endif()
 
 message(STATUS "aav: APK/zip support (miniz): ${AAV_MINIZ_AVAILABLE}")
 message(STATUS "aav: build tools: ${AAV_BUILD_TOOLS}  tests: ${AAV_BUILD_TESTS}")
-message(STATUS "aav: asan+ubsan: ${AAV_ENABLE_ASAN}")
+message(STATUS "aav: asan+ubsan: ${AAV_ENABLE_ASAN}  tsan: ${AAV_ENABLE_TSAN}")

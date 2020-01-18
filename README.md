@@ -243,7 +243,8 @@ or, the same thing in one line:
 scripts/build.sh          # PRESET=release scripts/build.sh for -O2
 scripts/test.sh           # build with tests enabled, then run them
 scripts/run.sh            # generate a sample and scan it end to end
-scripts/asan.sh           # sanitizer build + tests
+scripts/asan.sh           # ASan + UBSan build + tests
+scripts/tsan.sh           # ThreadSanitizer build + tests
 scripts/clean.sh          # remove the build root
 ```
 
@@ -262,6 +263,13 @@ AddressSanitizer and UndefinedBehaviorSanitizer:
 ```bash
 scripts/asan.sh
 # or: cmake --preset asan && cmake --build --preset asan -j && ctest --preset asan
+```
+
+The scan thread pool needs a different runtime, and the two cannot share a
+binary, so ThreadSanitizer is a separate build and a separate script:
+
+```bash
+scripts/tsan.sh
 ```
 
 Fuzzing the DEX parser (needs a Clang toolchain with libFuzzer):

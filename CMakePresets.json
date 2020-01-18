@@ -31,6 +31,13 @@
       "cacheVariables": { "AAV_ENABLE_ASAN": "ON" }
     },
     {
+      "name": "tsan",
+      "inherits": "base",
+      "displayName": "Debug + TSan",
+      "description": "ThreadSanitizer over the scan thread pool in src/engine/engine.cc. Its own preset rather than a mode of asan because the two runtimes cannot be linked into one binary; CMakeLists.txt refuses the combination outright.",
+      "cacheVariables": { "AAV_ENABLE_TSAN": "ON" }
+    },
+    {
       "name": "fuzz",
       "inherits": "base",
       "displayName": "Fuzzers (clang + libFuzzer)",
@@ -46,6 +53,7 @@
     { "name": "debug", "configurePreset": "debug" },
     { "name": "release", "configurePreset": "release" },
     { "name": "asan", "configurePreset": "asan" },
+    { "name": "tsan", "configurePreset": "tsan" },
     { "name": "fuzz", "configurePreset": "fuzz" }
   ],
   "testPresets": [
@@ -62,6 +70,13 @@
       "configurePreset": "asan",
       "description": "A UBSan report is only actionable with a stack trace, and the runtime has to be told to collect one. detect_leaks is deliberately absent: LeakSanitizer is already on by default with ASan on Linux, and setting it explicitly would abort every test on macOS, where LSan does not exist.",
       "environment": { "UBSAN_OPTIONS": "print_stacktrace=1" }
+    },
+    {
+      "name": "tsan",
+      "inherits": "base",
+      "configurePreset": "tsan",
+      "description": "TSan prints a race and lets the process exit 0, so unlike ASan/UBSan the abort has to come from the runtime rather than from -fno-sanitize-recover.",
+      "environment": { "TSAN_OPTIONS": "halt_on_error=1" }
     }
   ]
 }
