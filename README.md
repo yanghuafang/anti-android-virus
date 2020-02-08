@@ -245,6 +245,7 @@ scripts/test.sh           # build with tests enabled, then run them
 scripts/run.sh            # generate a sample and scan it end to end
 scripts/asan.sh           # ASan + UBSan build + tests
 scripts/tsan.sh           # ThreadSanitizer build + tests
+scripts/coverage.sh       # coverage build + gcovr report
 scripts/clean.sh          # remove the build root
 ```
 
@@ -271,6 +272,10 @@ binary, so ThreadSanitizer is a separate build and a separate script:
 ```bash
 scripts/tsan.sh
 ```
+
+`scripts/coverage.sh` builds instrumented, runs the same suites and reports
+line/branch coverage of `src/` through gcovr, failing under a floor
+(`COVERAGE_FAIL_UNDER`, 65% by default). `--html` writes a browsable report.
 
 Fuzzing the DEX parser (needs a Clang toolchain with libFuzzer):
 

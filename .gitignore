@@ -57,6 +57,15 @@ install_manifest.txt
 # ============================================================================
 # Test / analysis output
 # ============================================================================
+# Coverage: gcovr reports into the build tree, but a stray in-tree gcov run
+# leaves these behind (GCC), as does an instrumented binary (LLVM).
+*.gcda
+*.gcno
+*.gcov
+*.profraw
+*.profdata
+coverage_html/
+
 # libFuzzer crash / timeout reproducers, written to the working directory.
 crash-*
 leak-*

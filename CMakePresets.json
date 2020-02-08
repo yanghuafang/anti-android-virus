@@ -38,6 +38,12 @@
       "cacheVariables": { "AAV_ENABLE_TSAN": "ON" }
     },
     {
+      "name": "coverage",
+      "inherits": "base",
+      "displayName": "Debug + coverage (gcovr)",
+      "cacheVariables": { "AAV_ENABLE_COVERAGE": "ON" }
+    },
+    {
       "name": "fuzz",
       "inherits": "base",
       "displayName": "Fuzzers (clang + libFuzzer)",
@@ -54,6 +60,7 @@
     { "name": "release", "configurePreset": "release" },
     { "name": "asan", "configurePreset": "asan" },
     { "name": "tsan", "configurePreset": "tsan" },
+    { "name": "coverage", "configurePreset": "coverage" },
     { "name": "fuzz", "configurePreset": "fuzz" }
   ],
   "testPresets": [
@@ -77,6 +84,7 @@
       "configurePreset": "tsan",
       "description": "TSan prints a race and lets the process exit 0, so unlike ASan/UBSan the abort has to come from the runtime rather than from -fno-sanitize-recover.",
       "environment": { "TSAN_OPTIONS": "halt_on_error=1" }
-    }
+    },
+    { "name": "coverage", "inherits": "base", "configurePreset": "coverage" }
   ]
 }
