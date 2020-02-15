@@ -246,6 +246,8 @@ scripts/run.sh            # generate a sample and scan it end to end
 scripts/asan.sh           # ASan + UBSan build + tests
 scripts/tsan.sh           # ThreadSanitizer build + tests
 scripts/coverage.sh       # coverage build + gcovr report
+scripts/format.sh         # clang-format check (--fix to apply)
+scripts/tidy.sh           # clang-tidy check   (--fix to apply)
 scripts/clean.sh          # remove the build root
 ```
 
@@ -293,6 +295,20 @@ inputs are written under the fuzz build tree.
 cmake --preset debug && cmake --build ../anti-android-virus-build/debug -j
 ctest --preset debug
 ```
+
+## Style and static analysis
+
+Formatting is Google style with a few deliberate exceptions (`.clang-format`),
+and the check is a script rather than a convention: `scripts/format.sh`
+reports, `--fix` rewrites. It pins clang-format to one major, because layout
+heuristics move between them and skew means one machine rejects what another
+just produced.
+
+`scripts/tidy.sh` runs clang-tidy over the same sources using the build's
+compile database. `.clang-tidy` records which check families are off and why —
+each disabled family carries its reason, so the list is a set of decisions
+rather than a set of things nobody got to. `third_party/` is excluded from
+both: vendored code is not ours to reformat or lint.
 
 ## Project layout
 
