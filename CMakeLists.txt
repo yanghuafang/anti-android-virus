@@ -12,14 +12,24 @@ project(anti_android_virus
   DESCRIPTION "Efficient Android malware static detection engine (DEX)"
   LANGUAGES C CXX)
 
-option(AAV_BUILD_CLI   "Build the aavscan CLI executable" ON)
-option(AAV_BUILD_TOOLS "Build sigtool (feature/DB tooling)" ON)
-option(AAV_BUILD_TESTS "Build unit tests" OFF)
+# ---------------------------------------------------------------------------
+# Options
+# ---------------------------------------------------------------------------
+option(AAV_BUILD_CLI     "Build the aavscan CLI executable" ON)
+option(AAV_BUILD_TOOLS   "Build sigtool (feature/DB tooling)" ON)
+option(AAV_BUILD_TESTS   "Build unit tests" OFF)
 option(AAV_BUILD_FUZZERS "Build libFuzzer harnesses (clang only)" OFF)
 option(AAV_ENABLE_APK    "Enable APK (zip) scanning via miniz" ON)
+option(AAV_BUILD_SHARED  "Build the shared engine library (.so/.dylib)" ON)
 option(AAV_ENABLE_COVERAGE "Instrument for code coverage (--coverage)" OFF)
 option(AAV_ENABLE_ASAN "Instrument with AddressSanitizer + UndefinedBehaviorSanitizer" OFF)
 option(AAV_ENABLE_TSAN "Instrument with ThreadSanitizer" OFF)
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+  set(AAV_DEFAULT_INSTALL ON)
+else()
+  set(AAV_DEFAULT_INSTALL OFF)
+endif()
+option(AAV_INSTALL "Generate install rules for the aav SDK" ${AAV_DEFAULT_INSTALL})
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
@@ -113,15 +123,17 @@ if(AAV_ENABLE_COVERAGE)
 endif()
 
 # ---------------------------------------------------------------------------
-# Dependencies. zlib inflates the signature database, which is gzip-compressed
-# inside its encryption.
+# Dependencies
 # ---------------------------------------------------------------------------
 find_package(ZLIB REQUIRED)
 find_package(Threads REQUIRED)
 
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
 # ---------------------------------------------------------------------------
 # Optional APK (zip) support via miniz. miniz is compiled straight into the
-# engine library, so the shipped .a is self-contained. MINIZ_DIR and
+# engine libraries, so the shipped .a / .so are self-contained. MINIZ_DIR and
 # AAV_MINIZ_AVAILABLE are consumed by src/ (engine) and apps/ (sample fixtures).
 # ---------------------------------------------------------------------------
 set(AAV_MINIZ_AVAILABLE FALSE)
@@ -150,6 +162,47 @@ if(AAV_BUILD_FUZZERS)
   add_subdirectory(fuzz)
 endif()
 
+# ---------------------------------------------------------------------------
+# Install / SDK packaging: public headers + static + shared + CMake config so
+# consumers can `find_package(aav)` and link `aav::aav` (static) or
+# `aav::shared`.
+# ---------------------------------------------------------------------------
+if(AAV_INSTALL)
+  set(AAV_INSTALL_TARGETS aav)
+  if(AAV_BUILD_SHARED)
+    list(APPEND AAV_INSTALL_TARGETS aav_shared)
+  endif()
+
+  install(TARGETS ${AAV_INSTALL_TARGETS}
+    EXPORT aavTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+  # Public interface headers only (include/aav/*.h -> <prefix>/include/aav/).
+  install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/aav
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    FILES_MATCHING PATTERN "*.h")
+
+  install(EXPORT aavTargets
+    FILE aavTargets.cmake
+    NAMESPACE aav::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/aav)
+  configure_package_config_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/aavConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/aavConfig.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/aav)
+  write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/aavConfigVersion.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion)
+  install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/aavConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/aavConfigVersion.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/aav)
+endif()
+
 message(STATUS "aav: APK/zip support (miniz): ${AAV_MINIZ_AVAILABLE}")
+message(STATUS "aav: shared library: ${AAV_BUILD_SHARED}  install rules: ${AAV_INSTALL}")
 message(STATUS "aav: build tools: ${AAV_BUILD_TOOLS}  tests: ${AAV_BUILD_TESTS}")
 message(STATUS "aav: asan+ubsan: ${AAV_ENABLE_ASAN}  tsan: ${AAV_ENABLE_TSAN}  coverage: ${AAV_ENABLE_COVERAGE}")

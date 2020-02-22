@@ -17,8 +17,9 @@ gives the method, the algorithms, the architecture and the evaluation it was
 measured by. The code that follows is that design, so the thesis is the place to
 read *why* a scan is shaped the way it is.
 
-> **Status:** research / educational. The bundled sample database only detects
-> a synthetic sample produced by `sigtool`; it is not a real-world malware feed.
+> **Status:** early. This commit is the skeleton and the primitives every later
+> layer needs; the DEX parser, the signature database and the scan engine land
+> on top of them.
 
 ## The DEX front end
 
@@ -294,6 +295,35 @@ inputs are written under the fuzz build tree.
 ```bash
 cmake --preset debug && cmake --build ../anti-android-virus-build/debug -j
 ctest --preset debug
+```
+
+## Install / SDK
+
+The engine ships as an SDK — public headers plus a static **and** a shared
+library — installable to any prefix:
+
+```bash
+cmake --preset release && cmake --build ../anti-android-virus-build/release -j
+cmake --install ../anti-android-virus-build/release --prefix /path/to/sdk
+```
+
+which lays out:
+
+```
+/path/to/sdk/
+├── include/aav/      # public headers: engine_interface.h, object_interface.h, aav.h
+└── lib/
+    ├── libaav.a                   # static
+    ├── libaav.so / libaav.dylib   # shared (self-contained: miniz built in)
+    └── cmake/aav/                 # find_package(aav) config
+```
+
+Consume it from another CMake project:
+
+```cmake
+find_package(aav REQUIRED)
+target_link_libraries(myapp PRIVATE aav::aav)     # static
+# or:  target_link_libraries(myapp PRIVATE aav::shared)
 ```
 
 ## Style and static analysis
