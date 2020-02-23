@@ -16,7 +16,7 @@ command -v gcovr >/dev/null 2>&1 || die "gcovr not found. Install it with:
   Ubuntu: sudo apt install gcovr"
 
 # Flags live in the 'coverage' CMake preset, which builds into the build root.
-BUILD_PATH="$AAV_BUILD_ROOT/coverage"
+BUILD_PATH="$AAV_PRESET_ROOT/coverage"
 cd "$AAV_ROOT"  # `cmake --preset` reads CMakePresets.json from the current dir.
 
 WANT_HTML=0

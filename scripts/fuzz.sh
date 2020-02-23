@@ -22,7 +22,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 require cmake
 FUZZ_TIME="${FUZZ_TIME:-30}"
 # Flags live in the 'fuzz' CMake preset, which builds into the build root.
-BUILD_PATH="$AAV_BUILD_ROOT/fuzz"
+BUILD_PATH="$AAV_PRESET_ROOT/fuzz"
 
 BUILD_ONLY=0
 if [ "${1:-}" = "--build-only" ]; then

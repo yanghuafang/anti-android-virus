@@ -54,8 +54,8 @@ function(aav_apply_warnings tgt)
   if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     # -Wall -Wextra only: no -Werror. A warning should stop the person who
     # wrote it, not whoever next builds on a compiler one version newer, which
-    # is what -Werror means for a project built by three of them (gcc, distro
-    # clang, Apple clang).
+    # is what -Werror means for a project built by four of them (gcc, distro
+    # clang, Apple clang, the NDK's).
     target_compile_options(${tgt} PRIVATE -Wall -Wextra)
   elseif(MSVC)
     target_compile_options(${tgt} PRIVATE /W4)

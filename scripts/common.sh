@@ -7,11 +7,31 @@ set -euo pipefail
 
 AAV_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-# Everything generated lands here, outside the source tree, so the checkout only
-# ever holds tracked files. The default is a sibling of the repo, and
-# CMakePresets.json hard-codes the same one so `cmake --preset` and the scripts
-# agree.
+# Everything generated -- CMake trees and the NDK output no preset covers --
+# lands here, outside the source tree, so the checkout only ever holds tracked
+# files. The default is a sibling of the repo; override it to move the output
+# that is not produced by a CMake preset:
+#   AAV_BUILD_ROOT=/tmp/aav scripts/android.sh
+# CMakePresets.json hard-codes the same default, so `cmake --preset` agrees with
+# the scripts. See $AAV_PRESET_ROOT below for what an override does not move,
+# and why.
 AAV_BUILD_ROOT="${AAV_BUILD_ROOT:-$(cd "$AAV_ROOT/.." && pwd)/anti-android-virus-build}"
+
+# Where the CMake presets configure into, which is not the same question as
+# $AAV_BUILD_ROOT above and cannot be made into the same question.
+#
+# CMakePresets.json anchors every binaryDir to ${sourceDir}/.. because a preset
+# has no way to read an environment variable *with a fallback*: $env{} is empty
+# when the variable is unset, so honouring an override would break a bare
+# `cmake --preset debug`. The preset trees therefore stay put while the NDK,
+# Gradle and Doxygen output -- none of which goes through a preset -- follows
+# $AAV_BUILD_ROOT wherever it is pointed.
+#
+# Scripts that need to name a preset's tree afterwards (gcovr's input, the
+# fuzzer binary, the compile database) use this. Using $AAV_BUILD_ROOT for that
+# is how an override turns into a script reading a directory CMake never wrote.
+# Move this and CMakePresets.json together, or neither.
+AAV_PRESET_ROOT="$(cd "$AAV_ROOT/.." && pwd)/anti-android-virus-build"
 
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33mwarning:\033[0m %s\n' "$*" >&2; }
@@ -32,14 +52,18 @@ require() { command -v "$1" >/dev/null 2>&1 || die "'$1' not found in PATH"; }
 # cannot parse a current macOS SDK's libc++ at all. And its findings are
 # advisory in a way formatting is not. So it floats to whatever the host can
 # actually run.
+#
+# 18 is Ubuntu 24.04's, so Linux gets the pin from the archive and macOS gets it
+# from the llvm@18 keg.
 AAV_CLANG_FORMAT_VERSION="${AAV_CLANG_FORMAT_VERSION:-18}"
 
 # llvm_tool <name> [major] — echo the path to an LLVM tool, or empty if absent.
 #
 # With a major, that version is looked for first, so a machine carrying several
 # LLVMs still agrees with everyone else. Without one, the newest thing on hand
-# wins. Debian and Ubuntu install versioned binaries beside the unversioned
-# ones; Homebrew keeps every llvm keg-only, so its bin is not on PATH and
+# wins.
+# Debian and Ubuntu install versioned binaries beside the unversioned ones;
+# Homebrew keeps every llvm keg-only, so its bin is not on PATH and
 # `clang-format` would otherwise resolve to nothing (Xcode ships neither
 # clang-format nor clang-tidy).
 llvm_tool() {

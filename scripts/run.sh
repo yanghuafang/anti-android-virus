@@ -6,10 +6,10 @@
 #     no argument  -> scan the generated sample.dex
 #     file/dir     -> scan your own .dex/.apk (or a directory) with the sample DB
 #
-# Env: BUILD_DIR (default: $AAV_BUILD_ROOT/debug), SAMPLES_DIR (default: <repo>/samples)
+# Env: BUILD_DIR (default: $AAV_PRESET_ROOT/debug), SAMPLES_DIR (default: <repo>/samples)
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 
-BUILD_DIR="${BUILD_DIR:-$AAV_BUILD_ROOT/debug}"
+BUILD_DIR="${BUILD_DIR:-$AAV_PRESET_ROOT/debug}"
 BIN="$BUILD_DIR/bin"
 SAMPLES="${SAMPLES_DIR:-$AAV_ROOT/samples}"
 

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Configure + build the engine on the host.
+# Configure + build the engine, the aavscan CLI, and sigtool on the host.
 #
 #   scripts/build.sh [extra cmake configure args...]
 #
 # A wrapper around `cmake --preset "$PRESET"`, not a second way to configure the
-# project, so a build here and a build anywhere else differ only in the machine.
-# Anything the presets do not express still passes through as a configure
-# argument, e.g.
+# project: everything runs the same presets, so a build here and a build there
+# differ only in the machine. Anything the presets do not express still passes through
+# as a configure argument, e.g.
 #   scripts/build.sh -DCMAKE_BUILD_TYPE=RelWithDebInfo
 #
 # Env:
@@ -24,4 +24,5 @@ cmake --preset "$PRESET" "$@"
 log "Build"
 cmake --build --preset "$PRESET" -j
 
-log "Done. Library: $AAV_BUILD_ROOT/$PRESET/lib/libaav.a"
+BUILD_DIR="$AAV_PRESET_ROOT/$PRESET"
+log "Done. Binaries: $BUILD_DIR/bin (aavscan, sigtool)   library: $BUILD_DIR/lib/libaav.a"

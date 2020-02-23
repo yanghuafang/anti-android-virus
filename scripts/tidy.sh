@@ -17,7 +17,7 @@ require cmake
 require python3
 cd "$AAV_ROOT"
 
-BUILD_DIR="${BUILD_DIR:-$AAV_BUILD_ROOT/debug}"
+BUILD_DIR="${BUILD_DIR:-$AAV_PRESET_ROOT/debug}"
 
 FIX=0
 FILES=()

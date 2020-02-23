@@ -249,6 +249,7 @@ scripts/tsan.sh           # ThreadSanitizer build + tests
 scripts/coverage.sh       # coverage build + gcovr report
 scripts/format.sh         # clang-format check (--fix to apply)
 scripts/tidy.sh           # clang-tidy check   (--fix to apply)
+scripts/android.sh        # NDK cross-compile
 scripts/clean.sh          # remove the build root
 ```
 
@@ -378,6 +379,25 @@ single class before it can decode one.
 The logger is here for the same reason both of those are: it has to be usable
 from the first layer up, and on Android it has to reach logcat rather than
 stderr.
+
+## Android
+
+The engine (`libaav`) and the `aavscan` CLI **cross-compile for Android** via
+the NDK — the same sources, no Android-specific branch except the logger, which
+routes to logcat there instead of stderr:
+
+```bash
+ABI=arm64-v8a scripts/android.sh
+# or, by hand:
+cmake -S . -B ../anti-android-virus-build/android \
+  -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" \
+  -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-24 \
+  -DAAV_BUILD_CLI=OFF -DAAV_BUILD_TOOLS=OFF -DAAV_BUILD_TESTS=OFF
+cmake --build ../anti-android-virus-build/android -j
+```
+
+On-device is the case the whole design was aimed at: no emulation, no server
+round-trip, and a scan that costs a parse.
 
 ## License
 
