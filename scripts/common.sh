@@ -7,14 +7,14 @@ set -euo pipefail
 
 AAV_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-# Everything generated -- CMake trees and the NDK output no preset covers --
-# lands here, outside the source tree, so the checkout only ever holds tracked
-# files. The default is a sibling of the repo; override it to move the output
-# that is not produced by a CMake preset:
+# Everything generated -- CMake trees, Android/NDK output, the Gradle build
+# directories and project cache -- lands here, outside the source tree, so the
+# checkout only ever holds tracked files. The default is a sibling of the repo;
+# override it to move the output that is not produced by a CMake preset:
 #   AAV_BUILD_ROOT=/tmp/aav scripts/android.sh
-# CMakePresets.json hard-codes the same default, so `cmake --preset` agrees with
-# the scripts. See $AAV_PRESET_ROOT below for what an override does not move,
-# and why.
+# CMakePresets.json and android/build.gradle hard-code the same default, so
+# `cmake --preset` and a bare `./gradlew` agree with the scripts. See
+# $AAV_PRESET_ROOT below for what an override does not move, and why.
 AAV_BUILD_ROOT="${AAV_BUILD_ROOT:-$(cd "$AAV_ROOT/.." && pwd)/anti-android-virus-build}"
 
 # Where the CMake presets configure into, which is not the same question as

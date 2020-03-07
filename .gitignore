@@ -1,11 +1,16 @@
 # ============================================================================
 # Build systems
 # ============================================================================
-# CMake is pointed at ../anti-android-virus-build (CMakePresets.json,
-# scripts/common.sh), so nothing generated should land in the checkout at all.
-# These stay as a safety net for a tool invoked by hand with its own defaults --
-# a bare "build/" matches that directory at any depth.
+# Nothing generated should land in the checkout at all: CMake, Gradle and the
+# NDK are all pointed at ../anti-android-virus-build (CMakePresets.json,
+# scripts/common.sh, android/build.gradle). These stay as a safety net for a
+# tool invoked by hand with its own defaults -- a bare "build/" matches that
+# directory at any depth, including android/app/.
 build/
+.gradle/
+.cxx/
+.externalNativeBuild/
+captures/
 
 # CMake leftovers from an accidental in-source configure.
 CMakeCache.txt
@@ -134,3 +139,14 @@ $RECYCLE.BIN/
 # Generated sample fixtures (sigtool gen-sample; scripts/run.sh writes samples/)
 sample.dex
 sample.sig
+
+# Android: machine-local SDK path, build output, and signing material.
+local.properties
+*.apk
+*.aab
+*.hprof
+*.log
+output.json
+*.jks
+*.keystore
+google-services.json

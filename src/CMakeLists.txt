@@ -68,7 +68,7 @@ target_include_directories(aav_internal INTERFACE
 function(aav_apply_public_usage tgt)
   target_compile_features(${tgt} PUBLIC cxx_std_17)
   # PROJECT_SOURCE_DIR, not CMAKE_SOURCE_DIR: include/ must still resolve when
-  # a parent project pulls aav in via add_subdirectory().
+  # a parent project pulls aav in via add_subdirectory() (the JNI build does).
   target_include_directories(${tgt}
     PUBLIC
       $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
@@ -77,7 +77,7 @@ function(aav_apply_public_usage tgt)
     PUBLIC ZLIB::ZLIB Threads::Threads ${CMAKE_DL_LIBS})
   if(ANDROID)
     # log.cc uses __android_log_vprint from liblog. PUBLIC so it propagates to
-    # in-tree and SDK consumers.
+    # in-tree and SDK consumers (the JNI bridge).
     target_link_libraries(${tgt} PUBLIC log)
   endif()
 endfunction()

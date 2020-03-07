@@ -250,6 +250,7 @@ scripts/coverage.sh       # coverage build + gcovr report
 scripts/format.sh         # clang-format check (--fix to apply)
 scripts/tidy.sh           # clang-tidy check   (--fix to apply)
 scripts/android.sh        # NDK cross-compile
+scripts/android-app.sh    # assemble the demo app
 scripts/clean.sh          # remove the build root
 ```
 
@@ -348,6 +349,7 @@ both: vendored code is not ours to reformat or lint.
 ├── CMakeLists.txt   # root: language settings, warnings; delegates to subdirs
 ├── CMakePresets.json# debug / release
 ├── include/aav/     # public SDK headers
+├── android/         # Gradle + NDK app; JNI bridge over the engine
 ├── apps/
 │   ├── aavscan/     # CLI scanner (thin facade consumer)
 │   └── sigtool/     # sample DEX + signature-DB generator
@@ -398,6 +400,15 @@ cmake --build ../anti-android-virus-build/android -j
 
 On-device is the case the whole design was aimed at: no emulation, no server
 round-trip, and a scan that costs a parse.
+
+A demo app (`com.av.aav`) under [`android/`](android/README.md) drives the
+engine on the device through JNI. Its bridge is a consumer of the public
+`IEngine` facade and statically links `libaav`, so there is no separate engine
+`.so` and no engine internals in the app:
+
+```bash
+cd android && ./gradlew :app:assembleDebug     # SDK 36 / NDK 29 / JDK 17
+```
 
 ## License
 
