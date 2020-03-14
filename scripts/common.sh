@@ -39,6 +39,56 @@ die() { printf '\033[1;31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 
 require() { command -v "$1" >/dev/null 2>&1 || die "'$1' not found in PATH"; }
 
+# android_sdk_packages — echo the pinned sdkmanager package list, one per line.
+# The list itself lives in scripts/android-sdk-packages.txt, which explains why
+# each version is what it is.
+android_sdk_packages() {
+  grep -Ev '^[[:space:]]*(#|$)' "$AAV_ROOT/scripts/android-sdk-packages.txt"
+}
+
+# run_sdkmanager <sdkmanager> <sdk_root> [args...] — run sdkmanager unattended.
+#
+# Every package is gated behind a license prompt and `yes |` is the documented
+# way through it, but `yes` takes SIGPIPE once sdkmanager stops reading and
+# `set -o pipefail` would report that as a failed pipeline. Judge the run by
+# sdkmanager's own status instead.
+run_sdkmanager() {
+  local bin="$1" sdk="$2" rc=0
+  shift 2
+  yes | "$bin" --sdk_root="$sdk" "$@" || rc="${PIPESTATUS[1]}"
+  [ "$rc" -eq 0 ] || die "sdkmanager $* failed (exit $rc)"
+}
+
+# install_android_sdk <sdk_root> — accept the licenses and install the pinned
+# packages into an SDK that already has cmdline-tools/latest, then print the
+# environment scripts/android.sh and Gradle need.
+#
+# The NDK has to land inside the SDK, not beside it: scripts/android.sh reads
+# $ANDROID_NDK_HOME and would take a standalone NDK, but AGP resolves the
+# ndkVersion pin from $ANDROID_HOME/ndk/<version> and accepts nothing else.
+# Installing it with sdkmanager is what satisfies both.
+install_android_sdk() {
+  local sdk="$1" bin="$1/cmdline-tools/latest/bin/sdkmanager"
+  [ -x "$bin" ] || die "no sdkmanager at $bin (command-line tools not installed)"
+
+  # --licenses prints every license in full, which is not what anyone ran this
+  # script to read; the install below is the part worth watching.
+  log "Accepting SDK licenses"
+  run_sdkmanager "$bin" "$sdk" --licenses >/dev/null
+
+  local pkgs=()
+  while IFS= read -r pkg; do pkgs+=("$pkg"); done < <(android_sdk_packages)
+  log "Installing SDK packages: ${pkgs[*]}"
+  run_sdkmanager "$bin" "$sdk" "${pkgs[@]}"
+
+  local ndk
+  ndk="$(android_sdk_packages | sed -n 's/^ndk;//p')"
+  log "Done. Add to your profile:"
+  log "  export ANDROID_HOME=\"$sdk\""
+  log "  export ANDROID_NDK_HOME=\"$sdk/ndk/$ndk\""
+  log "  export PATH=\"$sdk/cmdline-tools/latest/bin:\$PATH\""
+}
+
 # The clang-format major this project pins, and the reason only clang-format is
 # pinned.
 #
@@ -103,6 +153,6 @@ warn_llvm_skew() {
   [ -n "$got" ] || return 0
   [ "$got" = "$want" ] && return 0
   warn "$(basename "$bin") is major $got, but this project pins $want.
-Formatting may differ from what the check expects, or set
-AAV_CLANG_FORMAT_VERSION=$got."
+Formatting may differ from what the check expects. Install the pinned tool with
+scripts/install-deps-{macos,ubuntu}.sh, or set AAV_CLANG_FORMAT_VERSION=$got."
 }

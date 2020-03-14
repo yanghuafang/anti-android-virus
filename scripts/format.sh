@@ -14,7 +14,8 @@ cd "$AAV_ROOT"
 FMT="${CLANG_FORMAT:-$(llvm_tool clang-format "$AAV_CLANG_FORMAT_VERSION")}"
 [ -n "$FMT" ] || die "clang-format not found. Install LLVM:
   macOS:  brew install llvm
-  Ubuntu: sudo apt install clang-format"
+  Ubuntu: sudo apt install clang-format
+or run scripts/install-deps-{macos,ubuntu}.sh."
 
 # Print the binary and version: layout heuristics move between clang-format
 # majors, so a diff that reproduces on one machine and not another is version

@@ -30,6 +30,7 @@ JNI — the port of the standalone `aav_app` onto the modernized engine.
 # From this directory:
 ./gradlew :app:assembleDebug
 # APK: ../../anti-android-virus-build/gradle/app/outputs/apk/debug/app-debug.apk
+# Toolchain: scripts/install-deps-{macos,ubuntu}.sh --android
 ```
 
 Or open the `android/` folder in Android Studio and Run.

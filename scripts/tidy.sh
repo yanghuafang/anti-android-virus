@@ -35,7 +35,8 @@ done
 TIDY="${CLANG_TIDY:-$(llvm_tool clang-tidy)}"
 [ -n "$TIDY" ] || die "clang-tidy not found. Install LLVM:
   macOS:  brew install llvm
-  Ubuntu: sudo apt install clang-tidy"
+  Ubuntu: sudo apt install clang-tidy
+or run scripts/install-deps-{macos,ubuntu}.sh."
 
 # Same reason as format.sh: check names and diagnostics move between majors.
 # Unpinned, unlike clang-format: clang-tidy compiles each file, so it has to be

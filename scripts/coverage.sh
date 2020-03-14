@@ -13,7 +13,8 @@ require cmake
 require ctest
 command -v gcovr >/dev/null 2>&1 || die "gcovr not found. Install it with:
   macOS:  brew install gcovr
-  Ubuntu: sudo apt install gcovr"
+  Ubuntu: sudo apt install gcovr
+or run scripts/install-deps-{macos,ubuntu}.sh."
 
 # Flags live in the 'coverage' CMake preset, which builds into the build root.
 BUILD_PATH="$AAV_PRESET_ROOT/coverage"

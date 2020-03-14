@@ -231,6 +231,11 @@ a `Destroy()` instead.
 
 APK/zip support (miniz) is vendored under `third_party/` — no extra dependency.
 
+Install everything (compilers, CMake, zlib, `clang-format`, `gcovr`, LLVM) in
+one step: `scripts/install-deps-ubuntu.sh` (Debian/Ubuntu) or
+`scripts/install-deps-macos.sh` (macOS); `--android` adds the SDK/NDK and a
+JDK.
+
 ## Build
 
 ```bash
