@@ -5,10 +5,12 @@
 #   scripts/fuzz.sh --build-only    build only; no run
 #   scripts/fuzz.sh [libFuzzer args...]
 #
-# --build-only exists because the two halves are worth different things: the
+# --build-only exists for CI, where the two halves are graded differently: the
 # build is a gate (a harness that stops compiling against the engine API is a
-# real break), while a seedless run explores different input every time, so a
-# finding from one is not a verdict on the change that triggered it.
+# real break), while a seedless run explores different input every time, so
+# failing a pull request on it would fail it for a finding it did not introduce.
+# Splitting them here rather than in the workflow keeps both halves reproducible
+# with one command.
 #
 # Requires a Clang with the libFuzzer + sanitizer runtimes:
 #   - Linux: the distro clang (CC=clang CXX=clang++)
@@ -44,9 +46,9 @@ if [ "$BUILD_ONLY" = "1" ]; then
 fi
 
 # libFuzzer writes a crashing input to the working directory and names it after
-# its hash, so the one artifact worth keeping lands wherever the run started.
-# Send them somewhere nameable instead; the trailing slash is what makes
-# libFuzzer treat this as a directory.
+# its hash, which on a CI runner means the one artifact worth keeping is the one
+# thrown away with the machine. Send them somewhere nameable instead; the
+# trailing slash is what makes libFuzzer treat this as a directory.
 ARTIFACTS="$BUILD_PATH/artifacts"
 mkdir -p "$ARTIFACTS"
 

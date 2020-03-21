@@ -1,5 +1,9 @@
 # anti-android-virus (aav) — Android malware static detection engine
 
+[![Build](https://github.com/yanghuafang/anti-android-virus/actions/workflows/build.yml/badge.svg)](https://github.com/yanghuafang/anti-android-virus/actions/workflows/build.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![C++17](https://img.shields.io/badge/C%2B%2B-17-blue.svg)](https://en.cppreference.com/w/cpp/17)
+
 `aav` (short for **Anti-Android-Virus**) is a **static** (non-emulating)
 detection engine for Android malware. It parses DEX bytecode and matches it
 against a compact, multi-dimensional signature database — class-path
@@ -346,6 +350,18 @@ compile database. `.clang-tidy` records which check families are off and why —
 each disabled family carries its reason, so the list is a set of decisions
 rather than a set of things nobody got to. `third_party/` is excluded from
 both: vendored code is not ours to reformat or lint.
+
+## Continuous integration
+
+`build.yml` runs the unit and end-to-end suites on Ubuntu and macOS, crossing
+each platform's compilers with Debug and Release. Release is an axis rather
+than an afterthought: `-O2` takes different paths through the DEX and zip
+parsers than `-O0`, and `assert()` is compiled out, so a Debug-only suite never
+executes the code that ships.
+
+Every step is a preset, so a red job reproduces locally with the one command it
+ran — `ctest --preset release` — rather than by transcribing flags out of a
+workflow file.
 
 ## Project layout
 

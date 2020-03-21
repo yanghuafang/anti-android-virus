@@ -15,7 +15,7 @@
       "name": "debug",
       "inherits": "base",
       "displayName": "Debug + tests",
-      "description": "The default working tree. AAV_BUILD_TESTS lives in the presets rather than on a command line so `cmake --preset debug && ctest --preset debug` reproduces what anyone else runs."
+      "description": "The default working tree. AAV_BUILD_TESTS lives in the presets rather than on a command line so `cmake --preset debug && ctest --preset debug` reproduces what CI runs."
     },
     {
       "name": "release",

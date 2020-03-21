@@ -4,8 +4,8 @@
 #   scripts/build.sh [extra cmake configure args...]
 #
 # A wrapper around `cmake --preset "$PRESET"`, not a second way to configure the
-# project: everything runs the same presets, so a build here and a build there
-# differ only in the machine. Anything the presets do not express still passes through
+# project: CI runs the same presets, so a build here and a build there differ
+# only in the machine. Anything the presets do not express still passes through
 # as a configure argument, e.g.
 #   scripts/build.sh -DCMAKE_BUILD_TYPE=RelWithDebInfo
 #

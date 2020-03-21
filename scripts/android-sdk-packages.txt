@@ -1,7 +1,7 @@
 # Android SDK packages the app build needs, in sdkmanager syntax. This is the
-# single source of truth: scripts/install-deps-{macos,ubuntu}.sh --android
-# installs exactly this list, so a bump here reaches every environment at
-# once.
+# single source of truth: scripts/install-deps-{macos,ubuntu}.sh --android and
+# the android-app CI job all install exactly this list, so a bump here reaches
+# every environment at once.
 #
 # The versions are not free-floating -- they have to match what the build files
 # declare, or Gradle re-resolves and fails:

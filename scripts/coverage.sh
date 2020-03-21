@@ -44,9 +44,10 @@ if "${CXX:-c++}" --version 2>/dev/null | grep -qi clang; then
   fi
 fi
 
-# The floor is the script's default rather than an argument every caller has to
-# remember: a threshold that lives outside the script is one a developer cannot
-# reproduce. Set it to 0 to report without gating.
+# The floor is the script's default, not something CI passes in: a threshold
+# that only exists in a workflow file is one a developer cannot reproduce, and
+# they find out it moved when the pull request goes red. Set it to 0 to report
+# without gating.
 FAIL_ARGS=(--fail-under-line "${COVERAGE_FAIL_UNDER:-65}")
 
 HTML_ARGS=()

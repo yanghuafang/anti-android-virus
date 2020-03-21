@@ -72,10 +72,10 @@ endfunction()
 # in the build, and the one parsing attacker-controlled zip data -- was the
 # single translation unit ASan never covered.
 #
-# -fno-sanitize-recover=all is what makes the build worth running unattended.
-# UBSan defaults to printing a diagnostic and continuing, so an overflow left
-# the process exit status at 0 and ctest reported a pass; aborting turns a
-# finding into a failed test. ASan already aborts.
+# -fno-sanitize-recover=all is what makes the build worth running in CI. UBSan
+# defaults to printing a diagnostic and continuing, so an overflow left the
+# process exit status at 0 and ctest reported a pass; aborting turns a finding
+# into a failed test. ASan already aborts.
 # ---------------------------------------------------------------------------
 if(AAV_ENABLE_ASAN)
   if(NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
