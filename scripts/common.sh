@@ -8,9 +8,10 @@ set -euo pipefail
 AAV_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # Everything generated -- CMake trees, Android/NDK output, the Gradle build
-# directories and project cache -- lands here, outside the source tree, so the
-# checkout only ever holds tracked files. The default is a sibling of the repo;
-# override it to move the output that is not produced by a CMake preset:
+# directories and project cache, the Doxygen site -- lands here, outside the
+# source tree, so the checkout only ever holds tracked files. The default is a
+# sibling of the repo; override it to move the output that is not produced by a
+# CMake preset:
 #   AAV_BUILD_ROOT=/tmp/aav scripts/android.sh
 # CMakePresets.json and android/build.gradle hard-code the same default, so
 # `cmake --preset` and a bare `./gradlew` agree with the scripts. See
@@ -93,25 +94,26 @@ install_android_sdk() {
 # pinned.
 #
 # clang-format reflows code differently between majors, and it is a hard gate:
-# skew means a check rejects exactly what a developer's editor just wrote. It is
-# also safe to pin, because clang-format never compiles anything -- it lexes, so
-# an older one is not bothered by a newer platform SDK.
+# skew means CI rejects exactly what a developer's editor just wrote. It is also
+# safe to pin, because clang-format never compiles anything -- it lexes, so an
+# older one is not bothered by a newer platform SDK.
 #
 # clang-tidy is the opposite on both counts. It compiles each translation unit,
 # so it has to be new enough for the host's standard library: clang-tidy 18
-# cannot parse a current macOS SDK's libc++ at all. And its findings are
-# advisory in a way formatting is not. So it floats to whatever the host can
-# actually run.
+# cannot parse the macOS 26 SDK's libc++ at all, which uses __builtin_clzg from
+# Clang 19. And its findings are advisory in a way formatting is not. So it
+# floats to whatever the host can actually run, and CI's Linux run -- pinned by
+# the runner image rather than by a version here -- is the authoritative one.
 #
-# 18 is Ubuntu 24.04's, so Linux gets the pin from the archive and macOS gets it
-# from the llvm@18 keg.
+# 18 is Ubuntu 24.04's, which is the pinned CI image, so Linux gets the pin from
+# the archive and macOS gets it from the llvm@18 keg. Moving this number means
+# moving the runner image with it.
 AAV_CLANG_FORMAT_VERSION="${AAV_CLANG_FORMAT_VERSION:-18}"
 
 # llvm_tool <name> [major] — echo the path to an LLVM tool, or empty if absent.
 #
 # With a major, that version is looked for first, so a machine carrying several
-# LLVMs still agrees with everyone else. Without one, the newest thing on hand
-# wins.
+# LLVMs still agrees with CI. Without one, the newest thing on hand wins.
 # Debian and Ubuntu install versioned binaries beside the unversioned ones;
 # Homebrew keeps every llvm keg-only, so its bin is not on PATH and
 # `clang-format` would otherwise resolve to nothing (Xcode ships neither
@@ -145,14 +147,14 @@ llvm_tool() {
 #
 # A warning rather than an error: an older or newer clang-format still formats,
 # and refusing to run would leave someone with no way to format anything. What
-# it prevents is the confusing half of the failure -- a clean run here and a
-# rejection elsewhere, with nothing on screen saying why.
+# it prevents is the confusing half of the failure -- a clean local run and a
+# red pull request, with nothing on screen saying why.
 warn_llvm_skew() {
   local bin="$1" want="$2" got
   got="$("$bin" --version 2>/dev/null | sed -n 's/.*version \([0-9][0-9]*\).*/\1/p' | head -1)"
   [ -n "$got" ] || return 0
   [ "$got" = "$want" ] && return 0
-  warn "$(basename "$bin") is major $got, but this project pins $want.
+  warn "$(basename "$bin") is major $got, but CI runs $want.
 Formatting may differ from what the check expects. Install the pinned tool with
 scripts/install-deps-{macos,ubuntu}.sh, or set AAV_CLANG_FORMAT_VERSION=$got."
 }

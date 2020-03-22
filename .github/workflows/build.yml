@@ -53,7 +53,7 @@ jobs:
 
       # Linux only. The macOS legs build with Apple Clang and the image's own
       # CMake, and install-deps-macos.sh would spend minutes on the llvm@18 keg
-      # for clang-format and clang-tidy, which this workflow never runs.
+      # for clang-format and clang-tidy -- tools lint.yml runs, not this one.
       - name: Install deps (Linux)
         if: runner.os == 'Linux'
         run: bash scripts/install-deps-ubuntu.sh

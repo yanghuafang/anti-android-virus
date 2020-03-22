@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run clang-format over the tracked C/C++ sources.
+# Run clang-format over the tracked C/C++ sources (the same file set as CI).
 #
 #   scripts/format.sh          check only; non-zero exit if anything is unformatted
 #   scripts/format.sh --fix    rewrite files in place
@@ -27,7 +27,7 @@ warn_llvm_skew "$FMT" "$AAV_CLANG_FORMAT_VERSION"
 # excluded, not merely unformatted: reformatting vendored miniz and doctest
 # would make every upstream resync an unreadable diff.
 #
-# The tracked-file listing is the right one -- it is the whole source set -- but it
+# The tracked-file listing is the right one -- it is what CI checks -- but it
 # needs a repository, and a copy of the tree without .git has none. Fall back
 # to walking the same directories so the check still runs there; the two agree
 # on any tree that has no untracked sources.

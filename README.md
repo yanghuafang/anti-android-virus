@@ -1,6 +1,7 @@
 # anti-android-virus (aav) — Android malware static detection engine
 
 [![Build](https://github.com/yanghuafang/anti-android-virus/actions/workflows/build.yml/badge.svg)](https://github.com/yanghuafang/anti-android-virus/actions/workflows/build.yml)
+[![Lint](https://github.com/yanghuafang/anti-android-virus/actions/workflows/lint.yml/badge.svg)](https://github.com/yanghuafang/anti-android-virus/actions/workflows/lint.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![C++17](https://img.shields.io/badge/C%2B%2B-17-blue.svg)](https://en.cppreference.com/w/cpp/17)
 
@@ -341,9 +342,9 @@ target_link_libraries(myapp PRIVATE aav::aav)     # static
 
 Formatting is Google style with a few deliberate exceptions (`.clang-format`),
 and the check is a script rather than a convention: `scripts/format.sh`
-reports, `--fix` rewrites. It pins clang-format to one major, because layout
-heuristics move between them and skew means one machine rejects what another
-just produced.
+reports, `--fix` rewrites, and CI runs the same script. It pins clang-format to
+one major, because layout heuristics move between them and skew means a clean
+local run becomes a red pull request.
 
 `scripts/tidy.sh` runs clang-tidy over the same sources using the build's
 compile database. `.clang-tidy` records which check families are off and why —
@@ -359,9 +360,15 @@ than an afterthought: `-O2` takes different paths through the DEX and zip
 parsers than `-O0`, and `assert()` is compiled out, so a Debug-only suite never
 executes the code that ships.
 
-Every step is a preset, so a red job reproduces locally with the one command it
-ran — `ctest --preset release` — rather than by transcribing flags out of a
-workflow file.
+`lint.yml` runs `scripts/format.sh` and `scripts/tidy.sh`. They are a separate
+workflow because cadence and blast radius are what a workflow boundary should
+follow: both answer in about a minute, depend on nothing about the host, and
+fail in a way that is fixed without reading a build log — so a stray space
+reads as "Lint failed" rather than as one red cell among a dozen build legs.
+
+Every step is a preset or a script, so a red job reproduces locally with the one
+command it ran — `ctest --preset release`, `scripts/format.sh` — rather than by
+transcribing flags out of a workflow file.
 
 ## Project layout
 

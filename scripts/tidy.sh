@@ -41,8 +41,8 @@ or run scripts/install-deps-{macos,ubuntu}.sh."
 # Same reason as format.sh: check names and diagnostics move between majors.
 # Unpinned, unlike clang-format: clang-tidy compiles each file, so it has to be
 # new enough for the host's standard library headers -- an older one fails to
-# parse them rather than reporting on this project. A different major here may
-# say more or less.
+# parse them rather than reporting on this project. CI's Linux run is the
+# authoritative one; a different major here may say more or less.
 log "Using $TIDY — $("$TIDY" --version | sed -n 's/.*version /clang-tidy /p' | head -1)"
 
 # A .clang-tidy that fails to parse -- an unknown key from a newer clang-tidy,
