@@ -5,7 +5,7 @@
 #
 # What this covers that scripts/asan.sh cannot: the scan thread pool in
 # src/engine/engine.cc and the mutex serializing Emit(). ASan and TSan cannot be
-# linked into one binary, so this is a separate build tree and a separate script
+# linked into one binary, so this is a separate build tree and a separate CI job
 # rather than another flag on the asan preset.
 #
 # A race aborts rather than prints, via TSAN_OPTIONS=halt_on_error=1 in the tsan

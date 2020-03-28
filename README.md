@@ -2,6 +2,7 @@
 
 [![Build](https://github.com/yanghuafang/anti-android-virus/actions/workflows/build.yml/badge.svg)](https://github.com/yanghuafang/anti-android-virus/actions/workflows/build.yml)
 [![Lint](https://github.com/yanghuafang/anti-android-virus/actions/workflows/lint.yml/badge.svg)](https://github.com/yanghuafang/anti-android-virus/actions/workflows/lint.yml)
+[![Sanitizers](https://github.com/yanghuafang/anti-android-virus/actions/workflows/sanitizers.yml/badge.svg)](https://github.com/yanghuafang/anti-android-virus/actions/workflows/sanitizers.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![C++17](https://img.shields.io/badge/C%2B%2B-17-blue.svg)](https://en.cppreference.com/w/cpp/17)
 
@@ -365,6 +366,9 @@ workflow because cadence and blast radius are what a workflow boundary should
 follow: both answer in about a minute, depend on nothing about the host, and
 fail in a way that is fixed without reading a build log — so a stray space
 reads as "Lint failed" rather than as one red cell among a dozen build legs.
+
+`sanitizers.yml` runs ASan/UBSan and TSan as separate jobs, because the two
+runtimes cannot be linked into one binary.
 
 Every step is a preset or a script, so a red job reproduces locally with the one
 command it ran — `ctest --preset release`, `scripts/format.sh` — rather than by
