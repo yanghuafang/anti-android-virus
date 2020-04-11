@@ -1,0 +1,78 @@
+name: Analysis
+
+# The two jobs that measure the engine rather than assert about it: how much of
+# it the suite reaches, and whether the fuzz harness still compiles against the
+# engine API. Neither proves the code correct, both say something about how well
+# it is covered, and both are the kind of failure you read a report for rather
+# than a diff.
+#
+# The fuzzer is built but not run. A seedless run explores different input every
+# time, so gating a pull request on it would fail changes for findings they did
+# not introduce -- while a harness that stops compiling is a real break and
+# belongs here. Running it is a developer's call: `scripts/fuzz.sh`, or
+# `FUZZ_TIME=900 scripts/fuzz.sh` for something closer to a real session.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      # gcc, so gcovr reads gcov data directly rather than through an llvm-cov
+      # shim -- these are the numbers the floor is calibrated against.
+      CC: gcc
+      CXX: g++
+    steps:
+      - uses: actions/checkout@v5
+      - run: bash scripts/install-deps-ubuntu.sh
+
+      # The floor lives in coverage.sh, not here: a threshold that only exists
+      # in a workflow file is one nobody can reproduce before pushing. Override
+      # it with COVERAGE_FAIL_UNDER if a branch needs to move it deliberately.
+      - name: Build, test, report
+        run: bash scripts/coverage.sh --html
+
+      - name: Resolve build root
+        # Where CMakePresets.json configures into -- a sibling of the checkout,
+        # so it cannot be named with a workspace-relative literal. Ask the script
+        # that owns the answer instead of repeating its arithmetic here.
+        run: echo "AAV_PRESET_ROOT=$(bash -c '. scripts/common.sh; echo "$AAV_PRESET_ROOT"')" >> "$GITHUB_ENV"
+
+      # A failed floor says a number; this says which lines. Uploaded on failure
+      # too -- that is the run where someone actually needs it.
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: ${{ env.AAV_PRESET_ROOT }}/coverage/coverage_html
+          if-no-files-found: warn
+
+  fuzz-build:
+    name: Fuzz build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v5
+      - run: bash scripts/install-deps-ubuntu.sh
+      # --build-only rather than the workflow inlining cmake: the split between
+      # what gates and what does not is a property of the project, so it lives
+      # in the script both this job and a developer can run.
+      - name: Build the harness
+        run: bash scripts/fuzz.sh --build-only

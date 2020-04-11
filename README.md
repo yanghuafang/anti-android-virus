@@ -3,6 +3,7 @@
 [![Build](https://github.com/yanghuafang/anti-android-virus/actions/workflows/build.yml/badge.svg)](https://github.com/yanghuafang/anti-android-virus/actions/workflows/build.yml)
 [![Lint](https://github.com/yanghuafang/anti-android-virus/actions/workflows/lint.yml/badge.svg)](https://github.com/yanghuafang/anti-android-virus/actions/workflows/lint.yml)
 [![Sanitizers](https://github.com/yanghuafang/anti-android-virus/actions/workflows/sanitizers.yml/badge.svg)](https://github.com/yanghuafang/anti-android-virus/actions/workflows/sanitizers.yml)
+[![Analysis](https://github.com/yanghuafang/anti-android-virus/actions/workflows/analysis.yml/badge.svg)](https://github.com/yanghuafang/anti-android-virus/actions/workflows/analysis.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![C++17](https://img.shields.io/badge/C%2B%2B-17-blue.svg)](https://en.cppreference.com/w/cpp/17)
 
@@ -300,10 +301,7 @@ FUZZ_TIME=60 scripts/fuzz.sh          # build and run
 scripts/fuzz.sh --build-only          # just check the harness still compiles
 ```
 
-A seedless run explores different input every time, so a fuzz run is a
-developer's call rather than something to gate a change on; what is worth
-keeping green is that the harness still compiles against the engine. Crashing
-inputs are written under the fuzz build tree.
+Crashing inputs are written under the fuzz build tree.
 
 ```bash
 cmake --preset debug && cmake --build ../anti-android-virus-build/debug -j
@@ -368,7 +366,14 @@ fail in a way that is fixed without reading a build log — so a stray space
 reads as "Lint failed" rather than as one red cell among a dozen build legs.
 
 `sanitizers.yml` runs ASan/UBSan and TSan as separate jobs, because the two
-runtimes cannot be linked into one binary.
+runtimes cannot be linked into one binary. `analysis.yml` holds the coverage
+floor and builds the fuzz harness.
+
+CI builds the fuzz harness but does not run it: a seedless run explores
+different input every time, so gating a pull request on it would fail changes
+for findings they did not introduce. What *does* gate is that the harness still
+compiles against the engine API. Running it is a developer's call —
+`scripts/fuzz.sh`, or `FUZZ_TIME=900 scripts/fuzz.sh` for a longer session.
 
 Every step is a preset or a script, so a red job reproduces locally with the one
 command it ran — `ctest --preset release`, `scripts/format.sh` — rather than by
