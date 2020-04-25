@@ -1,0 +1,95 @@
+name: Android
+
+# Android is its own workflow rather than a leg of the build matrix, and the
+# reason is the shape of the work, not the topic: it needs an SDK and an NDK
+# nothing else installs, it cross-compiles rather than builds, and a hosted
+# runner cannot execute a single one of its artifacts. Forced into the build
+# matrix it would be a column of cells that skip everything after "configure".
+#
+# Two jobs: the engine and CLI through the NDK toolchain directly, and the
+# sample app through Gradle, which builds the same engine again via AGP. The
+# second is not a superset of the first -- a Gradle failure and an NDK failure
+# read nothing alike -- but it is why the ABI here is only arm64-v8a.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  engine:
+    name: engine (arm64-v8a)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # No matrix: one ABI is the shipping target, and a matrix holding a single
+    # value is a cell that reads like an axis without being one. The other ABIs
+    # are the same toolchain invocation with a different ABI= -- add them here
+    # as a matrix the day more than one of them is actually shipped.
+    env:
+      ABI: arm64-v8a
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Cross-compile (NDK, API 24)
+        run: bash scripts/android.sh
+
+      - name: Resolve build root
+        run: echo "AAV_BUILD_ROOT=$(bash -c '. scripts/common.sh; echo "$AAV_BUILD_ROOT"')" >> "$GITHUB_ENV"
+
+      # Proves the cross-compile produced objects for the target rather than for
+      # the host, which is the one thing a hosted runner can check without
+      # being able to run them.
+      - name: Check target architecture
+        run: |
+          file "$AAV_BUILD_ROOT/android-$ABI/lib/libaav.a" \
+               "$AAV_BUILD_ROOT/android-$ABI/bin/aavscan"
+
+  app:
+    name: app (debug APK)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - uses: android-actions/setup-android@v3
+
+      # The same pinned list the install-deps scripts use, read by the same
+      # helper, so CI and a developer machine cannot drift apart.
+      - name: Install SDK packages
+        run: bash -c '. scripts/common.sh; android_sdk_packages | xargs sdkmanager'
+
+      # android-app.sh, not a bare gradlew: the project cache directory and the
+      # build output location are its business, and duplicating them here is how
+      # the two stop agreeing.
+      - name: Assemble debug APK
+        run: bash scripts/android-app.sh --no-daemon --stacktrace
+
+      - name: Resolve build root
+        run: echo "AAV_BUILD_ROOT=$(bash -c '. scripts/common.sh; echo "$AAV_BUILD_ROOT"')" >> "$GITHUB_ENV"
+
+      # upload-artifact only accepts paths inside the workspace, and the build
+      # root is a sibling of the checkout, so stage the APK back in first.
+      - name: Stage APK
+        run: |
+          mkdir -p artifacts
+          cp "$AAV_BUILD_ROOT"/gradle/app/outputs/apk/debug/*.apk artifacts/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aav-app-debug-apk
+          path: artifacts/*.apk
+          if-no-files-found: error

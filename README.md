@@ -4,6 +4,7 @@
 [![Lint](https://github.com/yanghuafang/anti-android-virus/actions/workflows/lint.yml/badge.svg)](https://github.com/yanghuafang/anti-android-virus/actions/workflows/lint.yml)
 [![Sanitizers](https://github.com/yanghuafang/anti-android-virus/actions/workflows/sanitizers.yml/badge.svg)](https://github.com/yanghuafang/anti-android-virus/actions/workflows/sanitizers.yml)
 [![Analysis](https://github.com/yanghuafang/anti-android-virus/actions/workflows/analysis.yml/badge.svg)](https://github.com/yanghuafang/anti-android-virus/actions/workflows/analysis.yml)
+[![Android](https://github.com/yanghuafang/anti-android-virus/actions/workflows/android.yml/badge.svg)](https://github.com/yanghuafang/anti-android-virus/actions/workflows/android.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![C++17](https://img.shields.io/badge/C%2B%2B-17-blue.svg)](https://en.cppreference.com/w/cpp/17)
 
@@ -367,7 +368,8 @@ reads as "Lint failed" rather than as one red cell among a dozen build legs.
 
 `sanitizers.yml` runs ASan/UBSan and TSan as separate jobs, because the two
 runtimes cannot be linked into one binary. `analysis.yml` holds the coverage
-floor and builds the fuzz harness.
+floor and builds the fuzz harness. `android.yml` cross-compiles the engine for
+arm64-v8a and assembles the app's debug APK.
 
 CI builds the fuzz harness but does not run it: a seedless run explores
 different input every time, so gating a pull request on it would fail changes
@@ -446,6 +448,9 @@ engine on the device through JNI. Its bridge is a consumer of the public
 ```bash
 cd android && ./gradlew :app:assembleDebug     # SDK 36 / NDK 29 / JDK 17
 ```
+
+CI cross-compiles the engine and assembles the debug APK on every change, so
+the Android claim is checked rather than asserted.
 
 ## License
 
