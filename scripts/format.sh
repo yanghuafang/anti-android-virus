@@ -28,9 +28,9 @@ warn_llvm_skew "$FMT" "$AAV_CLANG_FORMAT_VERSION"
 # would make every upstream resync an unreadable diff.
 #
 # The tracked-file listing is the right one -- it is what CI checks -- but it
-# needs a repository, and a copy of the tree without .git has none. Fall back
-# to walking the same directories so the check still runs there; the two agree
-# on any tree that has no untracked sources.
+# needs a repository, and scripts/remote-ubuntu.sh syncs the working tree
+# without .git. Fall back to walking the same directories so the check still
+# runs there; the two agree on any tree that has no untracked sources.
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   files=$(git ls-files '*.cc' '*.h' \
     | grep -E '^(include|src|apps|tests|fuzz|android)/' \

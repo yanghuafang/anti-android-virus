@@ -264,6 +264,7 @@ scripts/format.sh         # clang-format check (--fix to apply)
 scripts/tidy.sh           # clang-tidy check   (--fix to apply)
 scripts/android.sh        # NDK cross-compile
 scripts/android-app.sh    # assemble the demo app
+scripts/remote-ubuntu.sh  # run any of these on the Ubuntu box
 scripts/clean.sh          # remove the build root
 ```
 
@@ -337,6 +338,23 @@ find_package(aav REQUIRED)
 target_link_libraries(myapp PRIVATE aav::aav)     # static
 # or:  target_link_libraries(myapp PRIVATE aav::shared)
 ```
+
+## Running the Linux half from a Mac
+
+Part of what CI checks is unreachable from macOS: LeakSanitizer rides along with
+ASan on Linux only, the coverage gate is measured against gcc/gcov,
+`scripts/fuzz.sh` needs the distro clang's libFuzzer, and
+`install-deps-ubuntu.sh` is Debian-only. `scripts/remote-ubuntu.sh` runs any of
+these on an Ubuntu host instead of waiting for a pushed branch to disagree:
+
+```bash
+cd scripts
+./remote-ubuntu.sh --sync ./asan.sh   # mirror this tree, then ASan on Linux
+./remote-ubuntu.sh ./test.sh          # build + test what is already there
+```
+
+`--sync` is the only step that destroys anything (`rsync --delete`), so it is
+opt-in rather than the default.
 
 ## Style and static analysis
 
