@@ -5,6 +5,7 @@
 [![Sanitizers](https://github.com/yanghuafang/anti-android-virus/actions/workflows/sanitizers.yml/badge.svg)](https://github.com/yanghuafang/anti-android-virus/actions/workflows/sanitizers.yml)
 [![Analysis](https://github.com/yanghuafang/anti-android-virus/actions/workflows/analysis.yml/badge.svg)](https://github.com/yanghuafang/anti-android-virus/actions/workflows/analysis.yml)
 [![Android](https://github.com/yanghuafang/anti-android-virus/actions/workflows/android.yml/badge.svg)](https://github.com/yanghuafang/anti-android-virus/actions/workflows/android.yml)
+[![API reference](https://img.shields.io/badge/docs-API%20reference-blue)](https://yanghuafang.github.io/anti-android-virus/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![C++17](https://img.shields.io/badge/C%2B%2B-17-blue.svg)](https://en.cppreference.com/w/cpp/17)
 
@@ -264,6 +265,7 @@ scripts/format.sh         # clang-format check (--fix to apply)
 scripts/tidy.sh           # clang-tidy check   (--fix to apply)
 scripts/android.sh        # NDK cross-compile
 scripts/android-app.sh    # assemble the demo app
+scripts/docs.sh           # Doxygen API reference (--open shows it)
 scripts/remote-ubuntu.sh  # run any of these on the Ubuntu box
 scripts/clean.sh          # remove the build root
 ```
@@ -370,6 +372,19 @@ each disabled family carries its reason, so the list is a set of decisions
 rather than a set of things nobody got to. `third_party/` is excluded from
 both: vendored code is not ours to reformat or lint.
 
+## API reference
+
+The interface headers carry Doxygen comments: `include/aav/` (the public,
+ABI-clean SDK) and `src/api/aav/` (the internal object API, never installed).
+The rendered result is published at
+<https://yanghuafang.github.io/anti-android-virus/>, rebuilt from `main` on
+every push; `scripts/docs.sh` builds the same site locally.
+
+The prose is the same as in the headers. What the site adds is the diagram a
+header cannot show: `IScanObject` splitting into `IStream` and `ITarget`, and
+each of those into a file and a memory implementation — the shape that lets one
+scanner serve both `Scan()` and `ScanBuffer()`, spread across nine headers.
+
 ## Continuous integration
 
 `build.yml` runs the unit and end-to-end suites on Ubuntu and macOS, crossing
@@ -387,7 +402,8 @@ reads as "Lint failed" rather than as one red cell among a dozen build legs.
 `sanitizers.yml` runs ASan/UBSan and TSan as separate jobs, because the two
 runtimes cannot be linked into one binary. `analysis.yml` holds the coverage
 floor and builds the fuzz harness. `android.yml` cross-compiles the engine for
-arm64-v8a and assembles the app's debug APK.
+arm64-v8a and assembles the app's debug APK. `docs.yml` gates a clean Doxygen
+run and publishes the site from `main`.
 
 CI builds the fuzz harness but does not run it: a seedless run explores
 different input every time, so gating a pull request on it would fail changes

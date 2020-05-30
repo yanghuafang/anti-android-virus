@@ -9,13 +9,14 @@
 #   cmake     - build system
 #   llvm      - clang-tidy (Xcode ships neither it nor clang-format), plus a
 #               clang++ carrying the libFuzzer runtime Apple Clang lacks
-#   llvm@18   - clang-format only, at the pinned major. Formatting is a hard
+#   llvm@18   - clang-format only, at the major CI runs. Formatting is a hard
 #               gate and clang-format reflows differently between majors, so an
-#               unpinned one means the check rejects what your editor just
-#               wrote. clang-tidy is deliberately not taken from this keg: it
-#               compiles each file, and 18 cannot parse a current macOS SDK's
-#               libc++.
+#               unpinned one means CI rejects what your editor just wrote.
+#               clang-tidy is deliberately not taken from this keg: it compiles
+#               each file, and 18 cannot parse a current macOS SDK's libc++.
 #   gcovr     - coverage report
+#   doxygen   - API reference (scripts/docs.sh)
+#   graphviz  - the Doxyfile sets HAVE_DOT, so its diagrams need `dot`
 #
 # Both kegs are keg-only, so nothing here shadows Apple Clang; format.sh and
 # tidy.sh find the tools inside them by path, via llvm_tool in common.sh.
@@ -36,7 +37,7 @@ for a in "$@"; do
   case "$a" in
     --android) WANT_ANDROID=1 ;;
     -h | --help)
-      sed -n '2,31p' "$0"
+      sed -n '2,32p' "$0"
       exit 0
       ;;
     *) die "unknown option: $a (try --help)" ;;
@@ -47,7 +48,7 @@ done
 require brew
 
 log "Installing aav build/test dependencies (brew)"
-brew install cmake llvm "llvm@$AAV_CLANG_FORMAT_VERSION" gcovr
+brew install cmake llvm "llvm@$AAV_CLANG_FORMAT_VERSION" gcovr doxygen graphviz
 
 if [ "$WANT_ANDROID" = "1" ]; then
   # The formula, not the temurin cask: it installs without sudo, and Gradle

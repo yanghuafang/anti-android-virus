@@ -9,6 +9,10 @@ name: Lint
 # developer fixes without reading a build log -- and a separate file is a
 # separate status check, so a stray space reads as "Lint failed" rather than as
 # one red cell among a dozen build legs.
+#
+# The Doxygen gate is not here: docs.yml already builds the site to publish it,
+# and running docs.sh in two workflows on the same commit is one build of the
+# same thing too many. It gates there.
 
 on:
   push:

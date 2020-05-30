@@ -1,0 +1,103 @@
+name: Docs
+
+# Builds the Doxygen API reference, and publishes it to GitHub Pages from main.
+# Nothing generated is committed -- the site is rebuilt here every time.
+#
+# One build serves both purposes, which is why the pull request gate lives here
+# rather than in checks.yml: Doxygen exits 0 after warning about a broken
+# reference, so docs.sh gates on the warning log, and that gate is the same work
+# whether or not a deploy follows it.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # So a Pages settings change can be re-published without an empty commit.
+  workflow_dispatch:
+
+# Read-only by default, escalated in the one job that needs more. The build job
+# runs Doxygen over the whole tree; there is no reason for that job to be
+# holding a token that can publish. This is the reason building and deploying
+# are two jobs rather than one -- a permission set cannot cover half a job.
+permissions:
+  contents: read
+
+# Per-branch, like the other workflows -- superseded pull request builds are
+# waste. The serialization that actually matters is on the deploy job below,
+# which is where a cancellation could leave something half-published.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install deps (docs only)
+        run: bash scripts/install-deps-ubuntu.sh --docs-only
+
+      - name: Build the API reference
+        run: bash scripts/docs.sh
+
+      # Packaging only happens on the runs that can deploy. On a pull request
+      # the step above is the whole point -- the site is built to prove it
+      # builds clean -- and an artifact nothing will ever publish is upload time
+      # and storage spent on nothing.
+      #
+      # The site lands in the build root, a sibling of the checkout, and
+      # upload-pages-artifact only accepts paths inside the workspace: hence the
+      # copy, and hence asking common.sh where it put things rather than
+      # repeating that arithmetic here.
+      - name: Stage site
+        if: github.event_name != 'pull_request'
+        run: cp -r "$(bash -c '. scripts/common.sh; echo "$AAV_BUILD_ROOT"')/docs/html" _site
+
+      - uses: actions/upload-pages-artifact@v5
+        if: github.event_name != 'pull_request'
+        with:
+          path: _site
+
+  # Separate from the build for three reasons. The Pages service reports a
+  # deployment against an environment, and an environment cannot cover part of a
+  # job. And a deploy fails for reasons the build cannot cause -- Pages not
+  # enabled yet, a transient API error -- so keeping it its own job means
+  # "Re-run failed jobs" retries the deploy alone, leaving the uploaded artifact
+  # untouched. Re-running a combined job would upload a second artifact, and
+  # deploy-pages aborts on a run that has two rather than guessing which is
+  # current. And it is what lets a pull request run the build without holding
+  # any permission to publish what it produced.
+  deploy:
+    name: deploy
+    # Publishing follows main and nothing else: the site has one URL and the
+    # last deploy wins, so a pull request builds the site but never ships it.
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    # One deployment at a time, never cancelled midway: a half-published site is
+    # worse than a slightly stale one. Job-scoped rather than workflow-scoped so
+    # concurrent pull request builds do not queue behind each other on a group
+    # that exists to protect the deploy.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    # The only escalation in this repository: pages:write to hand the artifact
+    # to the Pages service, id-token:write to prove which run produced it.
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      # A 404 here means Pages is not enabled for the repository, or its source
+      # is a branch rather than GitHub Actions. Nothing in this file can set
+      # that: Settings > Pages > Source: GitHub Actions, or once via
+      # `gh api -X POST repos/OWNER/REPO/pages -f build_type=workflow`.
+      - id: deploy
+        uses: actions/deploy-pages@v5
