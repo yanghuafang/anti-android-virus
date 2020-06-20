@@ -49,8 +49,8 @@ INTERACTIVE_SVG        = YES
 CASE_SENSE_NAMES       = YES
 
 # Class diagrams yes, directory ones no: Doxygen emits a page per pair of
-# directories that include each other, each restating one #include edge, which
-# says nothing the headers do not.
+# directories that include each other, each restating one #include edge. The
+# layering is already prose in docs/Architecture.md and docs/ObjectModel.md.
 DIRECTORY_GRAPH        = NO
 
 GENERATE_LATEX         = NO

@@ -5,83 +5,51 @@
 [![Sanitizers](https://github.com/yanghuafang/anti-android-virus/actions/workflows/sanitizers.yml/badge.svg)](https://github.com/yanghuafang/anti-android-virus/actions/workflows/sanitizers.yml)
 [![Analysis](https://github.com/yanghuafang/anti-android-virus/actions/workflows/analysis.yml/badge.svg)](https://github.com/yanghuafang/anti-android-virus/actions/workflows/analysis.yml)
 [![Android](https://github.com/yanghuafang/anti-android-virus/actions/workflows/android.yml/badge.svg)](https://github.com/yanghuafang/anti-android-virus/actions/workflows/android.yml)
-[![API reference](https://img.shields.io/badge/docs-API%20reference-blue)](https://yanghuafang.github.io/anti-android-virus/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![C++17](https://img.shields.io/badge/C%2B%2B-17-blue.svg)](https://en.cppreference.com/w/cpp/17)
+[![API reference](https://img.shields.io/badge/docs-API%20reference-blue)](https://yanghuafang.github.io/anti-android-virus/)
 
 `aav` (short for **Anti-Android-Virus**) is a **static** (non-emulating)
-detection engine for Android malware. It parses DEX bytecode and matches it
-against a compact, multi-dimensional signature database — class-path
-signatures, opcode-sequence and string/operand-sequence CRCs, an opcode bitmap
-pre-filter, and AND/OR/XOR/NOT logic combinations — to decide whether a file is
-malicious and, if so, which family it belongs to.
-
-Static means no sandbox and no execution: scanning an untrusted APK costs a
-parse rather than a process, which is what makes it usable on the device it is
-protecting.
+detection engine for Android malware. It
+parses DEX bytecode (and the `classes.dex` inside an APK) and matches it against
+a compact, multi-dimensional **signature database** — class-path signatures,
+opcode-sequence and string/operand-sequence CRCs, an opcode bitmap pre-filter,
+and AND/OR/XOR/NOT logic combinations — to decide whether a file is malicious
+and, if so, which family it belongs to.
 
 Its detection method comes from the Master of Engineering thesis *"An Efficient
 Android Malware Static Detection System"* — [`docs/Thesis.md`](docs/Thesis.md)
-gives the method, the algorithms, the architecture and the evaluation it was
-measured by. The code that follows is that design, so the thesis is the place to
-read *why* a scan is shaped the way it is.
+gives the full method, algorithms, architecture and evaluation, and
+[`docs/Architecture.md`](docs/Architecture.md) shows how the design maps onto the
+code.
 
-> **Status:** early. This commit is the skeleton and the primitives every later
-> layer needs; the DEX parser, the signature database and the scan engine land
-> on top of them.
+> **Status:** research / educational. The bundled sample database only detects a
+> synthetic sample produced by `sigtool`; it is not a real-world malware feed.
 
-## The DEX front end
+## Requirements
 
-`DexFile` parses the container — header, id tables, class definitions, class
-data — and hands out one class and then one method at a time. `DexCode` walks a
-method's code item instruction by instruction and reduces it to two buffers: the
-opcode sequence, and the constant operands (the strings a method references).
-Those two buffers are what detection matches on, so the parser's job ends where
-their CRC32s begin.
+- CMake ≥ 3.21
+- A C++17 compiler (GCC ≥ 9, Clang ≥ 10, or Apple Clang)
+- zlib (`zlib1g-dev` on Debian/Ubuntu; preinstalled on macOS)
+- *(optional)* Clang with the libFuzzer + sanitizer runtimes, to build the fuzzers
 
-The parser is written from scratch and bounds-checks every offset it follows,
-because the input is hostile by definition: malware deliberately emits DEX that
-off-the-shelf tools mis-parse. Versions `035`–`040` are accepted, including the
-method-handle and `invoke-custom` opcodes DEX 038/039 added.
+APK/zip support (miniz) is vendored under `third_party/` — no extra dependency.
 
-## Matching class paths
-
-The first detection dimension is the package path: whole families live under one
-package, so `com.aav.sample.evil` classifies a class without looking at a single
-instruction.
-
-Matching is an Aho-Corasick trie, but keyed on the CRC32 of each dotted segment
-rather than on characters. A path has a handful of segments and thousands of
-signatures share prefixes, so one walk over the segments visits every candidate
-at once instead of testing signatures one at a time. A hit is confirmed by
-logic over the matched signature's parts — a package alone can be too broad, so
-a signature can require several paths together.
-
-## Matching method code
-
-The second dimension is the method body. `DexCode` already reduces a method to
-an opcode sequence and a constant-operand sequence; each becomes a CRC32, and a
-signature is a CRC to find plus a boolean expression over CRCs —
-AND/OR/XOR/NOT — that has to hold before the file is called malicious. One
-fragment is rarely a behavior; a combination is.
-
-Two things keep that cheap. The CRC tables are sorted and binary-searched, so a
-lookup is logarithmic in the number of signatures. And ahead of them sits an
-opcode **bitmap**: a method's first eight opcodes, packed pairwise, are tested
-against a per-position allow-list, so a method no signature could match is
-skipped before its CRCs are ever computed.
+Install everything (compilers, CMake, zlib, `clang-format`, `gcovr`, LLVM) in one
+step: `scripts/install-deps-ubuntu.sh` (Debian/Ubuntu) or
+`scripts/install-deps-macos.sh` (macOS).
 
 ## Quick start
 
 ```bash
-# 1. Configure + build (Debug, with the tests enabled)
-cmake --preset debug
+# 1. Configure + build (Debug, with the unit/e2e tests enabled)
+cmake --preset debug -DAAV_BUILD_TESTS=ON
 cmake --build ../anti-android-virus-build/debug -j
 
 # 2. Generate a self-consistent sample DEX + signature DB
 ../anti-android-virus-build/debug/bin/sigtool gen-sample samples
 
-# 3. Scan the sample: <signature-db> <apk|dex file or dir>
+# 3. Scan the sample: <signature-db> <apk|dex file|dir>
 ../anti-android-virus-build/debug/bin/aavscan samples/sample.sig samples/sample.dex
 ```
 
@@ -95,222 +63,92 @@ file: samples/sample.dex
 scanned 1 file(s), 1 flagged, 0.000s
 ```
 
-`scripts/run.sh` is those three steps in one command.
+`aavscan` accepts a single file or a directory (it walks the directory and scans
+every `*.apk` / `*.dex` it finds), plus a few optional runtime flags:
 
-`--analysis` prints, after the scan, every class the parser saw with its fields
-and every method with its opcode/operand CRC32s and referenced strings. That is
-the data a new signature is written from — see
-[`docs/Signatures.md`](docs/Signatures.md). It is off by default because it
-records every method, which means bypassing the bitmap pre-filter that makes a
-normal scan fast.
+- `--debug` — verbose engine diagnostics (stderr on host, logcat on Android),
+  off by default so real-time scanning stays fast.
+- `--analysis` — after scanning, print every method's opcode/operand CRC32s and
+  referenced strings. This is the data used to author new signatures; off by
+  default because it records every method (no bitmap pre-filter), so it is
+  slower.
+- `--mt <threads>` — scan a directory across `<threads>` worker threads (default
+  `1` = sequential). Only directory scans are parallelized; a single file is
+  always scanned on the calling thread. Reports are still delivered one at a
+  time, so output matches a sequential scan apart from ordering.
 
-`aavscan` also takes a directory and walks it, scanning every `*.apk` / `*.dex`
-it finds. `--mt <threads>` spreads that walk across worker threads; a single
-file is always scanned on the calling thread, and reports still arrive one at a
-time, so the output matches a sequential scan apart from ordering.
-
-`sigtool` exists because a detection engine is untestable without detection
-data, and a real malware database cannot be checked into a public repository.
-It synthesizes a DEX and the signature database that matches it, from one
-generator the unit tests reuse — so the fixtures and the tool cannot drift, and
-the whole pipeline runs with no external assets. The on-disk format the tool
-writes is documented in
-[`docs/SignatureDbFormat.md`](docs/SignatureDbFormat.md).
+Full usage:
+`aavscan [--debug] [--analysis] [--mt <threads>] <signature-db> <apk|dex file|dir>`.
 
 ## Embedding the engine
 
-The whole pipeline is driven through one facade, `aav/engine_interface.h` (plus
-`aav/object_interface.h`, the `IObject::Destroy()` base). That is the entire
-public API, and it is deliberately ABI-clean: only PODs, C strings and a
+The engine is driven through one small facade, `aav/engine_interface.h` (plus
+`aav/object_interface.h`, the `IObject::Destroy()` base). This is the **entire**
+public API, and it is deliberately **ABI-clean**: only PODs, C strings and a
 callback cross the boundary — no `std::` containers or smart pointers — so a
-prebuilt library stays usable across compiler and stdlib versions. File
-identification, signature-DB loading, scanner selection and directory walking
-all sit behind it:
+prebuilt `libaav.so` stays compatible across compiler/stdlib versions. File
+identification, signature-DB loading, scanner selection, APK unpacking and
+directory walking are all hidden behind it:
 
 ```cpp
 #include "aav/engine_interface.h"
 
 static void on_report(const aav::ScanReport* r, void* user) {
   if (r->is_malware) {
-    // r->path, r->sig_ids[0..sig_count), r->names[...], and r->classes[...]
-    // when analysis is enabled -- all engine-owned, valid only during this
-    // call.
+    // r->path, r->sig_ids[0..sig_count), r->names[...], and r->classes[...] when
+    // analysis is enabled -- all engine-owned, valid only during this call.
   }
 }
 
 aav::IEngine* engine = aav::MakeEngine();
-aav::EngineConfig config;   // scan_apk / scan_dex / recurse_dirs / verbose /
-                            // analysis / scan_threads (>1 parallelizes dirs)
+aav::EngineConfig config;  // scan_apk / scan_dex / recurse_dirs / verbose /
+                           // analysis / scan_threads (>1 parallelizes dir scans)
 engine->Init("samples/sample.sig", &config);
-engine->Scan("path/to/file-or-dir", on_report, nullptr);
-// ...or scan an image already in RAM, with no file on disk:
-// (apk/dex auto-detected)
+
+engine->Scan("path/to/file-or-dir", on_report, nullptr);  // file OR dir; APKs unpacked
+// ...or scan an image already in RAM (no file on disk); apk/dex auto-detected:
 engine->ScanBuffer(bytes, size, "app.apk", on_report, nullptr);
-engine->Destroy();          // release the engine (never `delete` it)
+
+engine->Destroy();  // release the engine (never `delete` it)
 ```
 
-`aavscan` is that snippet with argument parsing and printing around it:
+Link against the engine with `target_link_libraries(app PRIVATE aav::aav)`
+(static) or `aav::shared` (shared). See [Install / SDK](#install--sdk) to consume
+it as a packaged SDK via `find_package(aav)`.
 
-```
-aavscan [--debug] [--analysis] [--mt <threads>] <signature-db> <apk|dex file or dir>
-```
+## Scripts
 
-## Scanning an APK
-
-An APK is a zip, and every `classes*.dex` inside it is a scan target: multidex
-splits one app across `classes.dex`, `classes2.dex` and so on, so stopping at
-the first member misses whatever was moved out of it. `ApkScanner` unpacks each
-one into memory and runs the DEX detection over it, merging the hits into one
-verdict for the file.
-
-Unpacking uses vendored miniz — one C file, no new dependency — and members are
-scanned from RAM rather than written out, which is both faster and the only
-option when the APK itself came from a buffer.
-
-## Identifying a file
-
-A scanner is chosen by what a file *is*, not by what it is called: `FileId`
-reads the leading bytes off an `IStream` and reports DEX, ZIP, or unknown. An
-extension is attacker-controlled and a renamed APK is the oldest trick there is.
-
-Because it reads through `IStream`, the same identification runs on a path and
-on a buffer.
-
-## Scanning a DEX
-
-`DexScanner` is the first thing that produces a verdict. It takes an `ITarget`,
-runs `DexParser` over it, and returns a `ScanResult`: whether the file is
-malicious, and the signature ids that say so. The two dimensions are merged as
-a set union — either alone is a detection, and a signature found by both is
-reported once.
-
-`IScanner` is the shape every future format shares, so an APK or an ELF scanner
-is a new implementation rather than a new caller.
-
-## The signature database
-
-Detection data ships as one file: a header, then one section per signature
-dimension, the whole thing gzip-compressed inside Blowfish. `SigMgr` decrypts
-and inflates it once at load and hands each section to the matcher that owns
-that dimension, so nothing above it parses the container.
-
-The encryption is obfuscation and tamper-evidence, not secrecy — the key is in
-the engine. What it buys is that a database cannot be edited casually on a
-device, and that a corrupted one fails at load rather than as a wrong verdict.
-
-## One abstraction, files and memory
-
-`ScanBuffer` is what the file/memory split was for: the same scanners, the same
-identification and the same verdict, over bytes that were never written to
-disk. A gateway holds an APK in RAM already, and copying it to a temporary file
-to scan it is exactly the cost this avoids.
-
-
-A scan target is either a file on disk or a block already in RAM, and the
-engine should not care which. `IScanObject` splits into two shapes instead:
-
-- `IStream` — sequential access with a cursor, for containers that are read
-  front to back (an APK's zip directory).
-- `ITarget` — the whole image addressable at once, for a leaf being parsed (a
-  DEX, which seeks all over its own tables).
-
-Each has a file and a memory implementation (`FileStream`/`MemStream`,
-`FileTarget`/`MemTarget`), so one set of scanners serves both an on-disk scan
-and a gateway scanning bytes it never wrote down.
-
-## Ownership
-
-Every engine object derives from `aav::IObject` and is released through
-`Destroy()`, which runs `delete this` inside the library — so a caller never
-links an `operator delete` for an engine type and a prebuilt library stays
-usable across compiler and stdlib versions. Inside the engine that call is
-never written by hand: `aav::ObjPtr<T>` is a `unique_ptr` whose deleter is
-`Destroy()`, so ownership is RAII throughout.
-
-`ObjPtr` is deliberately internal. `unique_ptr` is not ABI-stable across
-compilers, which is exactly why the public surface hands out a raw pointer and
-a `Destroy()` instead.
-
-## Requirements
-
-- CMake ≥ 3.21
-- A C++17 compiler (GCC ≥ 9, Clang ≥ 10, or Apple Clang)
-- *(optional)* Clang with the libFuzzer + sanitizer runtimes, to build the fuzzers
-- zlib (`zlib1g-dev` on Debian/Ubuntu; preinstalled on macOS)
-
-APK/zip support (miniz) is vendored under `third_party/` — no extra dependency.
-
-Install everything (compilers, CMake, zlib, `clang-format`, `gcovr`, LLVM) in
-one step: `scripts/install-deps-ubuntu.sh` (Debian/Ubuntu) or
-`scripts/install-deps-macos.sh` (macOS); `--android` adds the SDK/NDK and a
-JDK.
-
-## Build
+Prefer one-liners? [`scripts/`](scripts/) wraps the commands above:
 
 ```bash
-cmake --preset debug
-cmake --build ../anti-android-virus-build/debug -j
+scripts/build.sh     # configure + build (engine, aavscan, sigtool)
+scripts/test.sh      # build + unit + e2e tests
+scripts/run.sh       # generate a sample and scan it end-to-end
+scripts/asan.sh      # sanitizer build + tests
+scripts/format.sh    # clang-format check (--fix to apply)
+scripts/tidy.sh      # clang-tidy check   (--fix to apply)
+scripts/docs.sh      # Doxygen API reference (--open shows it)
 ```
 
-or, the same thing in one line:
+The last three are each a CI job that fails the build, so running them before a
+pull request is what keeps it green. See [`scripts/README.md`](scripts/README.md)
+for the full set (fuzzing, Android, clean).
 
-```bash
-scripts/build.sh          # PRESET=release scripts/build.sh for -O2
-scripts/test.sh           # build with tests enabled, then run them
-scripts/run.sh            # generate a sample and scan it end to end
-scripts/asan.sh           # ASan + UBSan build + tests
-scripts/tsan.sh           # ThreadSanitizer build + tests
-scripts/coverage.sh       # coverage build + gcovr report
-scripts/format.sh         # clang-format check (--fix to apply)
-scripts/tidy.sh           # clang-tidy check   (--fix to apply)
-scripts/android.sh        # NDK cross-compile
-scripts/android-app.sh    # assemble the demo app
-scripts/docs.sh           # Doxygen API reference (--open shows it)
-scripts/remote-ubuntu.sh  # run any of these on the Ubuntu box
-scripts/clean.sh          # remove the build root
-```
+## Build options
 
-Nothing is written inside the checkout: the presets and the scripts both build
-into the sibling `../anti-android-virus-build/`.
+| Option              | Default | Description                                    |
+| ------------------- | ------- | ---------------------------------------------- |
+| `AAV_BUILD_TOOLS`   | `ON`    | Build `sigtool` (sample/DB generator)          |
+| `AAV_BUILD_TESTS`   | `OFF`   | Build unit tests + register the CTest suite    |
+| `AAV_BUILD_FUZZERS` | `OFF`   | Build the libFuzzer harness(es) (Clang only)   |
+| `AAV_ENABLE_APK`    | `ON`    | APK/zip scanning via vendored miniz            |
+| `AAV_BUILD_SHARED`  | `ON`    | Build the shared library (`libaav.so`/`.dylib`)|
+| `AAV_ENABLE_COVERAGE` | `OFF` | Instrument for gcovr line/branch coverage      |
+| `AAV_ENABLE_ASAN`    | `OFF` | Instrument with ASan + UBSan                   |
+| `AAV_INSTALL`       | `ON`\*  | Generate SDK install rules (\*top-level only)  |
 
-## Testing
-
-Two suites, both under CTest: the doctest unit tests, and end-to-end tests that
-run `sigtool` and `aavscan` as the user does and check that both sample
-signatures fire.
-
-The parsers are the untrusted-input surface, so the same suites also run under
-AddressSanitizer and UndefinedBehaviorSanitizer:
-
-```bash
-scripts/asan.sh
-# or: cmake --preset asan && cmake --build --preset asan -j && ctest --preset asan
-```
-
-The scan thread pool needs a different runtime, and the two cannot share a
-binary, so ThreadSanitizer is a separate build and a separate script:
-
-```bash
-scripts/tsan.sh
-```
-
-`scripts/coverage.sh` builds instrumented, runs the same suites and reports
-line/branch coverage of `src/` through gcovr, failing under a floor
-(`COVERAGE_FAIL_UNDER`, 65% by default). `--html` writes a browsable report.
-
-Fuzzing the DEX parser (needs a Clang toolchain with libFuzzer):
-
-```bash
-FUZZ_TIME=60 scripts/fuzz.sh          # build and run
-scripts/fuzz.sh --build-only          # just check the harness still compiles
-```
-
-Crashing inputs are written under the fuzz build tree.
-
-```bash
-cmake --preset debug && cmake --build ../anti-android-virus-build/debug -j
-ctest --preset debug
-```
+Configure presets (`CMakePresets.json`): `debug`, `release`, `asan`, `coverage`,
+`fuzz`.
 
 ## Install / SDK
 
@@ -341,129 +179,117 @@ target_link_libraries(myapp PRIVATE aav::aav)     # static
 # or:  target_link_libraries(myapp PRIVATE aav::shared)
 ```
 
-## Running the Linux half from a Mac
-
-Part of what CI checks is unreachable from macOS: LeakSanitizer rides along with
-ASan on Linux only, the coverage gate is measured against gcc/gcov,
-`scripts/fuzz.sh` needs the distro clang's libFuzzer, and
-`install-deps-ubuntu.sh` is Debian-only. `scripts/remote-ubuntu.sh` runs any of
-these on an Ubuntu host instead of waiting for a pushed branch to disagree:
+## Testing
 
 ```bash
-cd scripts
-./remote-ubuntu.sh --sync ./asan.sh   # mirror this tree, then ASan on Linux
-./remote-ubuntu.sh ./test.sh          # build + test what is already there
+# Unit + end-to-end tests
+cmake --preset debug -DAAV_BUILD_TESTS=ON && cmake --build ../anti-android-virus-build/debug -j
+ctest --test-dir ../anti-android-virus-build/debug --output-on-failure
+
+# AddressSanitizer + UndefinedBehaviorSanitizer
+cmake --preset asan -DAAV_BUILD_TESTS=ON && cmake --build ../anti-android-virus-build/asan -j
+ctest --test-dir ../anti-android-virus-build/asan --output-on-failure
 ```
 
-`--sync` is the only step that destroys anything (`rsync --delete`), so it is
-opt-in rather than the default.
+Fuzzing the DEX parser (requires a Clang toolchain with libFuzzer):
 
-## Style and static analysis
+```bash
+FUZZ_TIME=60 scripts/fuzz.sh          # build and run
+scripts/fuzz.sh --build-only          # just check the harness still compiles
+```
 
-Formatting is Google style with a few deliberate exceptions (`.clang-format`),
-and the check is a script rather than a convention: `scripts/format.sh`
-reports, `--fix` rewrites, and CI runs the same script. It pins clang-format to
-one major, because layout heuristics move between them and skew means a clean
-local run becomes a red pull request.
+CI (GitHub Actions) is split by cadence rather than by topic, one workflow per
+kind of failure:
 
-`scripts/tidy.sh` runs clang-tidy over the same sources using the build's
-compile database. `.clang-tidy` records which check families are off and why —
-each disabled family carries its reason, so the list is a set of decisions
-rather than a set of things nobody got to. `third_party/` is excluded from
-both: vendored code is not ours to reformat or lint.
+| Workflow          | What it gates                                                        |
+| ----------------- | -------------------------------------------------------------------- |
+| `lint.yml`        | `clang-format` and `clang-tidy`                                       |
+| `build.yml`       | one job per platform, each iterating GCC/Clang × Debug/Release + CTest |
+| `sanitizers.yml`  | ASan/UBSan, and TSan over the scan thread pool — separate jobs        |
+| `analysis.yml`    | the gcovr line-coverage floor, and that the fuzz harness still compiles |
+| `android.yml`     | NDK cross-compile for arm64-v8a, plus the sample app's debug APK      |
+| `docs.yml`        | a clean Doxygen run; publishes the API reference to Pages from `main` |
 
-## API reference
+Every step is a preset or a script, so a red job reproduces locally with the one
+command it ran — `ctest --preset release`, `scripts/tsan.sh` — rather than by
+transcribing flags out of a workflow file. Every check has a fixed name — the
+build workflow reports one per platform and iterates the compilers and build
+types inside it — so branch protection names them directly:
 
-The interface headers carry Doxygen comments: `include/aav/` (the public,
-ABI-clean SDK) and `src/api/aav/` (the internal object API, never installed).
-The rendered result is published at
-<https://yanghuafang.github.io/anti-android-virus/>, rebuilt from `main` on
-every push; `scripts/docs.sh` builds the same site locally.
+```
+Lint / clang-format          Sanitizers / ASan + UBSan    Analysis / Coverage
+Lint / clang-tidy            Sanitizers / TSan            Analysis / Fuzz build
+Build / Ubuntu               Android / engine (arm64-v8a) Docs / build
+Build / macOS                Android / app (debug APK)
+```
 
-The prose is the same as in the headers. What the site adds is the diagram a
-header cannot show: `IScanObject` splitting into `IStream` and `ITarget`, and
-each of those into a file and a memory implementation — the shape that lets one
-scanner serve both `Scan()` and `ScanBuffer()`, spread across nine headers.
-
-## Continuous integration
-
-`build.yml` runs the unit and end-to-end suites on Ubuntu and macOS, crossing
-each platform's compilers with Debug and Release. Release is an axis rather
-than an afterthought: `-O2` takes different paths through the DEX and zip
-parsers than `-O0`, and `assert()` is compiled out, so a Debug-only suite never
-executes the code that ships.
-
-`lint.yml` runs `scripts/format.sh` and `scripts/tidy.sh`. They are a separate
-workflow because cadence and blast radius are what a workflow boundary should
-follow: both answer in about a minute, depend on nothing about the host, and
-fail in a way that is fixed without reading a build log — so a stray space
-reads as "Lint failed" rather than as one red cell among a dozen build legs.
-
-`sanitizers.yml` runs ASan/UBSan and TSan as separate jobs, because the two
-runtimes cannot be linked into one binary. `analysis.yml` holds the coverage
-floor and builds the fuzz harness. `android.yml` cross-compiles the engine for
-arm64-v8a and assembles the app's debug APK. `docs.yml` gates a clean Doxygen
-run and publishes the site from `main`.
+`Docs / deploy` is the one job that does not gate a pull request: it only
+publishes from `main`, and is the only job anywhere that holds `pages: write`.
 
 CI builds the fuzz harness but does not run it: a seedless run explores
 different input every time, so gating a pull request on it would fail changes
 for findings they did not introduce. What *does* gate is that the harness still
 compiles against the engine API. Running it is a developer's call —
-`scripts/fuzz.sh`, or `FUZZ_TIME=900 scripts/fuzz.sh` for a longer session.
-
-Every step is a preset or a script, so a red job reproduces locally with the one
-command it ran — `ctest --preset release`, `scripts/format.sh` — rather than by
-transcribing flags out of a workflow file.
+`scripts/fuzz.sh`, or `FUZZ_TIME=900 scripts/fuzz.sh` for a longer session,
+which writes any crashing input under the fuzz build tree.
 
 ## Project layout
 
 ```
 .
-├── CMakeLists.txt   # root: language settings, warnings; delegates to subdirs
-├── CMakePresets.json# debug / release
-├── include/aav/     # public SDK headers
-├── android/         # Gradle + NDK app; JNI bridge over the engine
-├── apps/
-│   ├── aavscan/     # CLI scanner (thin facade consumer)
-│   └── sigtool/     # sample DEX + signature-DB generator
+├── CMakeLists.txt            # root: options, deps, install; delegates to subdirs
+├── CMakePresets.json         # debug / release / asan / coverage / fuzz presets
+├── include/aav/              # public SDK: engine_interface.h + object_interface.h + aav.h
 ├── src/
-│   ├── api/aav/     # internal object API (interfaces, factories) — not exported
-│   ├── engine/      # the IEngine facade implementation
-│   ├── platform/    # file/memory primitives (FileStream, FileTarget, MemTarget)
-│   ├── sig/         # signature-DB load/decrypt/decompress, format
-│   ├── dex/         # DEX parser + path/opcode/operand/logic matchers
-│   ├── scan/        # file-type id (FileId) + APK (zip) unpacking
-│   └── utils/       # crc32, leb128, blowfish, gzip inflate, logger
+│   ├── engine/               # the IEngine facade implementation
+│   ├── api/aav/              # internal object API (interfaces, factories, data records) — not exported
+│   ├── platform/             # file/memory primitives (FileStream, FileTarget, FileMap, MemTarget)
+│   ├── utils/                # crc32, leb128, blowfish, gzip inflate, logger
+│   ├── sig/                  # signature-DB load/decrypt/decompress, format
+│   ├── dex/                  # DEX parser + path/opcode/operand/logic matchers
+│   └── scan/                 # file-type id (FileId) + APK (zip) white-list check
+├── apps/
+│   ├── aavscan/              # CLI scanner (thin facade consumer)
+│   └── sigtool/              # sample DEX + signature-DB generator
+├── android/                  # Gradle + NDK app; JNI bridge over the engine
 ├── tests/
-│   ├── unit/        # doctest white-box unit tests (one binary)
-│   └── e2e/         # generate-and-scan end-to-end CTest drivers
-├── fuzz/            # libFuzzer harness for the DEX parser
-├── third_party/     # vendored: miniz (zip), doctest
-├── scripts/         # build.sh, test.sh, run.sh, clean.sh
-└── docs/            # Thesis.md, Signatures.md, SignatureDbFormat.md
+│   ├── unit/                 # doctest white-box unit tests (one binary)
+│   └── e2e/                  # generate-and-scan end-to-end CTest drivers
+├── fuzz/                     # libFuzzer harness for the DEX parser
+├── third_party/              # vendored: miniz (zip), doctest
+├── scripts/                  # build.sh, test.sh, asan.sh, coverage.sh,
+│                             # format.sh, tidy.sh, docs.sh, fuzz.sh, android*.sh
+└── docs/                     # guides — see docs/README.md for the index
+    └── doxygen/              # Doxyfile + landing page for the API reference
 ```
 
-## Why CRC32 and LEB128 first
+## Documentation
 
-They are the two things the rest of the design assumes. Detection reduces every
-method to CRC32s of its opcode and operand sequences, so the checksum is on the
-hot path of every scan rather than a utility; and DEX stores nearly every count,
-offset and index as an unsigned or signed LEB128, so the parser cannot read a
-single class before it can decode one.
+Full index: [`docs/README.md`](docs/README.md).
 
-The logger is here for the same reason both of those are: it has to be usable
-from the first layer up, and on Android it has to reach logcat rather than
-stderr.
+| Guide | Topics |
+|-------|--------|
+| [Thesis.md](docs/Thesis.md) | Full English thesis (method, algorithms, architecture, evaluation), rewritten to match this code |
+| [Architecture.md](docs/Architecture.md) | Scan pipeline, engine components, thesis→code mapping |
+| [ObjectModel.md](docs/ObjectModel.md) | Interface hierarchy, file-vs-memory abstraction, RAII, namespacing |
+| [Building.md](docs/Building.md) | Build options, install/SDK, testing, sanitizers, fuzzing, Android |
+| [Signatures.md](docs/Signatures.md) | Authoring signatures with `sigtool` / `aavscan --analysis` |
+| [SignatureDbFormat.md](docs/SignatureDbFormat.md) | On-disk `*.sig` signature-database binary format |
+| [Benchmarks.md](docs/Benchmarks.md) | Detection / FPR / scan-speed results (thesis Ch. 5), vs. Antiy AVL SDK and 360 |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Build, test, and pull-request workflow |
+
+The generated [API reference](https://yanghuafang.github.io/anti-android-virus/)
+renders the same comments the interface headers carry, adding the one thing they
+cannot show: the inheritance diagrams for the `IScanObject` → `IStream`/`ITarget`
+hierarchy that makes files and memory interchangeable. `scripts/docs.sh` builds
+it locally.
 
 ## Android
 
-The engine (`libaav`) and the `aavscan` CLI **cross-compile for Android** via
-the NDK — the same sources, no Android-specific branch except the logger, which
-routes to logcat there instead of stderr:
+The core engine (`libaav`) and the `aavscan` CLI **cross-compile for Android**
+via the NDK; CI builds the arm64-v8a (ARM64) ABI on every change:
 
 ```bash
-ABI=arm64-v8a scripts/android.sh
-# or, by hand:
 cmake -S . -B ../anti-android-virus-build/android \
   -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" \
   -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-24 \
@@ -471,20 +297,19 @@ cmake -S . -B ../anti-android-virus-build/android \
 cmake --build ../anti-android-virus-build/android -j
 ```
 
-On-device is the case the whole design was aimed at: no emulation, no server
-round-trip, and a scan that costs a parse.
+A demo **Android app** (`com.av.aav`) that drives the engine on-device via JNI
+lives under [`android/`](android/README.md); its JNI bridge is a consumer of the
+public `IEngine` SDK facade and statically links `libaav` (no separate engine
+`.so`). Build it with
+`cd android && ./gradlew :app:assembleDebug` (SDK 36 / NDK 29 / JDK 17); CI
+assembles the debug APK on every change.
 
-A demo app (`com.av.aav`) under [`android/`](android/README.md) drives the
-engine on the device through JNI. Its bridge is a consumer of the public
-`IEngine` facade and statically links `libaav`, so there is no separate engine
-`.so` and no engine internals in the app:
+## Contributing
 
-```bash
-cd android && ./gradlew :app:assembleDebug     # SDK 36 / NDK 29 / JDK 17
-```
-
-CI cross-compiles the engine and assembles the debug APK on every change, so
-the Android claim is checked rather than asserted.
+Contributions are welcome — parser hardening, new tests, docs, opcode/version
+support, and engine features. Please read [CONTRIBUTING.md](CONTRIBUTING.md) for
+the build / test / coding-style workflow, and run `scripts/test.sh` and
+`scripts/asan.sh` before opening a pull request.
 
 ## License
 

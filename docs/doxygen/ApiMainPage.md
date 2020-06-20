@@ -3,9 +3,13 @@
 This is the generated reference for `aav`'s interface headers — a static
 (non-emulating) Android malware detection engine that parses DEX bytecode and
 matches it against a multi-dimensional signature database. It documents what
-each interface is for and how the pieces fit together.
+each interface is for and how the pieces fit together. The narrative
+documentation is not here: it lives in the repository, and
+[docs/README.md](https://github.com/yanghuafang/anti-android-virus/blob/main/docs/README.md)
+indexes it.
 
-This page exists only as the landing page for the generated site.
+This page exists only as the landing page for the generated site; it is not one
+of the guides.
 
 ## Two surfaces, and which one you want
 
@@ -38,3 +42,8 @@ for leaf images like DEX), and each of those has a file implementation and a
 memory implementation. That is what lets the *same* scanner run against a file
 on disk and a block in RAM — `Scan()` and `ScanBuffer()` — and in the source it
 is nine headers and a `: public` clause at a time.
+
+For the scan pipeline stage by stage, see
+[docs/Architecture.md](https://github.com/yanghuafang/anti-android-virus/blob/main/docs/Architecture.md);
+for the interface hierarchy as prose, see
+[docs/ObjectModel.md](https://github.com/yanghuafang/anti-android-virus/blob/main/docs/ObjectModel.md).

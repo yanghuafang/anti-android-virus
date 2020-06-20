@@ -27,7 +27,7 @@ for a in "$@"; do
   esac
 done
 
-command -v doxygen >/dev/null 2>&1 || die "doxygen not found.
+command -v doxygen >/dev/null 2>&1 || die "doxygen not found. See docs/Building.md.
   macOS:  brew install doxygen
   Ubuntu: sudo apt install doxygen
 or run scripts/install-deps-{macos,ubuntu}.sh."

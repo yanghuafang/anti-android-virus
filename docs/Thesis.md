@@ -415,7 +415,8 @@ and Android (NDK, `arm64-v8a`). Quality is enforced by per-module unit tests and
 end-to-end tests, AddressSanitizer/UBSan, a libFuzzer harness, line/branch
 coverage with a CI floor, and a continuous-integration matrix spanning the three
 platforms with dedicated sanitizer, fuzz, coverage, and formatting jobs; the code
-follows the Google C++ Style Guide.
+follows the Google C++ Style Guide. See [Architecture.md](Architecture.md),
+[ObjectModel.md](ObjectModel.md), and [Building.md](Building.md).
 
 ---
 
@@ -424,7 +425,9 @@ follows the Google C++ Style Guide.
 > The measurements below were obtained by the reference prototype on the device
 > described in §5.1. The published open-source build ships only a synthetic
 > sample database and has not been re-measured against a real malware feed, so
-> the figures should be read as properties of the method.
+> the figures should be read as properties of the method. Full detail and the
+> procedure to reproduce them on the current code are in
+> [Benchmarks.md](Benchmarks.md).
 
 ### 5.1 Methodology and environment
 
