@@ -26,6 +26,72 @@ code.
 > **Status:** research / educational. The bundled sample database only detects a
 > synthetic sample produced by `sigtool`; it is not a real-world malware feed.
 
+---
+
+## Why this project
+
+|  |  |
+|---|---|
+| **Static, no emulation** | Detects malware by parsing DEX bytecode and matching signatures — no sandbox, no execution — so it is fast and safe to run on untrusted input. |
+| **Multi-dimensional detection** | Combines class-path signatures, opcode- and string-sequence CRCs, an opcode bitmap pre-filter, and AND/OR/XOR/NOT logic — not one brittle heuristic. |
+| **One abstraction, files *and* memory** | A small `IStream` / `ITarget` hierarchy lets the *same* scanners run on a file on disk **or** a block in RAM (`Scan` vs `ScanBuffer`) — ideal for on-device *and* gateway scanning. See [docs/ObjectModel.md](docs/ObjectModel.md). |
+| **A real, ABI-clean SDK** | The whole engine is driven by one namespaced facade (`aav::IEngine`) that crosses the boundary with only PODs, C strings and a callback, so a prebuilt `libaav.so` stays compatible across compilers. |
+| **Self-contained & tested** | `sigtool` generates a consistent sample DB + DEX, so it builds, runs, and tests end-to-end with no external assets; fuzzed under ASan/UBSan and CI'd on Linux, macOS, and Android. |
+| **Grounded in a thesis** | Implements the method from the Master of Engineering thesis *"An Efficient Android Malware Static Detection System"* ([docs/Thesis.md](docs/Thesis.md)) — a compact, readable codebase for studying and extending that design. |
+
+## How it works
+
+```
+file or directory
+  │  FileId: DEX, ZIP/APK, or unknown?  (from magic)
+  ▼
+┌── ZIP/APK ─► ApkScanner: unpack classes*.dex (miniz), scan each ─┐
+│                                                                  │
+└── DEX ───────────────────────────────────────────► DexScanner ◄─┘
+                                                          │
+   DexFile   parse header, id tables, classes, methods, code items
+                                                          │
+   DexCode   per method: opcode buffer + operand/string buffer (+ CRC32s)
+                                                          │
+   opcode bitmap pre-filter ─► DexSigMgr: path / opcode-CRC / operand-CRC
+                               + AND/OR/XOR/NOT logic ─► matched sig IDs
+                                                          │
+                                                          ▼
+                     ScanReport (path, is_malware, sig IDs + names)
+```
+
+The engine takes a file or an in-memory image, identifies it, and — for a DEX or
+the `classes*.dex` inside an APK — reduces each method to compact **features**
+(class path, opcode sequence, referenced strings) that it matches against the
+signature database. That matching is engineered to be cheap: an Aho–Corasick trie
+over path-segment CRCs, binary search over sorted code-CRC tables, and an opcode
+**bitmap** that skips methods no signature could match keep a whole-file scan
+close to **O(n · log S)** (for *n* methods and *S* signatures) instead of the
+O(n · S) of linear matchers — the source of the speed reported in
+[docs/Benchmarks.md](docs/Benchmarks.md). Full walkthrough:
+[docs/Architecture.md](docs/Architecture.md); the interface hierarchy that makes
+files and memory interchangeable is in [docs/ObjectModel.md](docs/ObjectModel.md).
+
+## Features
+
+- **DEX static analysis** — a hardened, bounds-checked DEX parser (fuzzed under
+  ASan/UBSan) that walks classes, methods and code items. Handles DEX versions
+  `035`–`040` (Android 1.0 through 10+), including the modern method-handle /
+  invoke-custom opcodes (DEX 038/039).
+- **Multi-dimensional matching**
+  - class-path signatures via an Aho–Corasick trie over per-segment CRC32s;
+  - an opcode **bitmap** pre-filter to skip irrelevant methods cheaply;
+  - opcode-sequence and operand(string)-sequence **CRC** signatures;
+  - **logic combinations** (AND/OR/XOR/NOT) over code CRCs to confirm a hit.
+- **APK support** — extracts every multidex member (`classes.dex`,
+  `classes2.dex`, …) from the zip container (via vendored miniz), scans them all
+  and merges the hits.
+- **Self-contained tooling** — `sigtool` synthesizes a consistent sample DEX and
+  a matching encrypted/compressed signature DB, so the whole pipeline runs and
+  tests end-to-end with no external assets.
+- **Modern C++17** — RAII ownership (`aav::ObjPtr`), factory functions, no
+  hand-rolled reference counting, cross-platform on Linux, macOS, and Android.
+
 ## Requirements
 
 - CMake ≥ 3.21
