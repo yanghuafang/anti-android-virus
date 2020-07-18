@@ -1,0 +1,71 @@
+name: Sanitizers
+
+# The engine running instrumented over the sample DEX and the malformed input
+# the unit tests feed it -- the bug-hunting half that .clang-tidy leaves to a
+# tool which actually executes the code.
+#
+# Two jobs, not one, and not a matrix cell on the build workflow: ASan and TSan
+# cannot be linked into the same binary, so they are separate builds by
+# necessity rather than by preference. CMakeLists.txt refuses the combination
+# outright, and the asan and tsan presets are what keep the two apart.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  asan:
+    name: ASan + UBSan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v5
+      - run: bash scripts/install-deps-ubuntu.sh
+
+      # Ubuntu 24.04 raised vm.mmap_rnd_bits to 32, which ASan runtimes older
+      # than LLVM 18 cannot map a shadow region under -- they abort before main
+      # with "Shadow memory range interleaves with an existing memory mapping".
+      # The pinned image ships clang 18, so this is insurance rather than a
+      # fix; it is what keeps the job from depending on that staying true, and
+      # it is what a gcc leg would need outright.
+      - name: Relax ASLR for ASan
+        run: sudo sysctl -w vm.mmap_rnd_bits=28
+
+      # detect_leaks is deliberately not set here. LeakSanitizer is already on
+      # by default with ASan on Linux, so setting it would change nothing on
+      # this runner -- and putting it in the preset instead would abort every
+      # test on macOS, where LSan does not exist. This job being Linux-only is
+      # what makes it the place the Destroy()/ObjPtr ownership gets verified.
+      - name: Build & test
+        run: bash scripts/asan.sh
+
+  tsan:
+    name: TSan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v5
+      - run: bash scripts/install-deps-ubuntu.sh
+
+      # What this covers and asan cannot: the scan thread pool in
+      # src/engine/engine.cc and the mutex serializing Emit(), driven by the
+      # e2e_multithread test. Unlike UBSan, TSan is not covered by
+      # -fno-sanitize-recover=all -- it reports a race and lets the process exit
+      # 0 -- so the abort comes from TSAN_OPTIONS in the tsan test preset.
+      - name: Build & test
+        run: bash scripts/tsan.sh

@@ -1,0 +1,17 @@
+# Android SDK packages the app build needs, in sdkmanager syntax. This is the
+# single source of truth: scripts/install-deps-{macos,ubuntu}.sh --android and
+# the android-app CI job all install exactly this list, so a bump here reaches
+# every environment at once.
+#
+# The versions are not free-floating -- they have to match what the build files
+# declare, or Gradle re-resolves and fails:
+#   platforms;android-36   android/app/build.gradle  compileSdk 36
+#   build-tools;36.0.0     the compileSdk's matching build tools
+#   ndk;29.0.14206865      android/app/build.gradle  ndkVersion
+#   cmake;3.22.1           AGP's bundled CMake for the externalNativeBuild
+#
+# Consumers strip the comments:  grep -v '^#' <this file> | xargs sdkmanager
+platforms;android-36
+build-tools;36.0.0
+ndk;29.0.14206865
+cmake;3.22.1

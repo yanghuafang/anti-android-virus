@@ -1,0 +1,18 @@
+plugins {
+    id 'com.android.application' version '8.11.1' apply false
+}
+
+// Keep generated output out of the checkout: every project builds into
+// <build root>/gradle/<project> instead of android/<project>/build. The default
+// build root matches CMakePresets.json and scripts/common.sh's $AAV_BUILD_ROOT;
+// point somewhere else with -PaavBuildRoot=/path (or by exporting the same env
+// var the scripts use). Gradle's own cache is not settable from here -- pass
+// --project-cache-dir, as scripts/android-app.sh does.
+def aavBuildRootPath = findProperty('aavBuildRoot')
+    ?: System.getenv('AAV_BUILD_ROOT')
+    ?: "$rootDir/../../anti-android-virus-build"
+ext.aavBuildRoot = file(aavBuildRootPath)
+
+allprojects {
+    layout.buildDirectory.set(new File(rootProject.ext.aavBuildRoot, "gradle/${project.name}"))
+}
