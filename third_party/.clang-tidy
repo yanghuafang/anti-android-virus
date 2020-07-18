@@ -1,0 +1,11 @@
+# Vendored upstream code: not ours to lint.
+#
+# clang-tidy uses the nearest config walking up from each file, and a child
+# config replaces the parent's unless InheritParentConfig is set, so this
+# disables every check under third_party/ without listing anything.
+#
+# scripts/tidy.sh already drops these paths from its file list; this covers the
+# other callers -- an IDE driving clang-tidy from compile_commands.json, or a
+# direct run naming third_party/miniz/miniz.c, both of which would otherwise
+# analyze upstream code against this project's rules.
+Checks: '-*'

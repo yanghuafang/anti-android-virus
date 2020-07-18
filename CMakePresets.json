@@ -1,0 +1,90 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "description": "Everything every preset agrees on. binaryDir uses ${presetName}, so a preset's name and its build directory cannot drift apart -- scripts/common.sh names those trees as $AAV_PRESET_ROOT/<preset>, and that only stays true if it is one rule rather than six copies. Debug and AAV_BUILD_TESTS are the majority default; release and fuzz each override the one they disagree with.",
+      "binaryDir": "${sourceDir}/../anti-android-virus-build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "AAV_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "debug",
+      "inherits": "base",
+      "displayName": "Debug + tests",
+      "description": "The default working tree. AAV_BUILD_TESTS lives in the presets rather than on a command line so `cmake --preset debug && ctest --preset debug` reproduces what CI runs."
+    },
+    {
+      "name": "release",
+      "inherits": "base",
+      "displayName": "Release + tests",
+      "description": "-O2 takes different paths through the parsers than -O0, and assert() is compiled out, so this is a separate gate rather than a variant of debug.",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "asan",
+      "inherits": "base",
+      "displayName": "Debug + ASan/UBSan",
+      "cacheVariables": { "AAV_ENABLE_ASAN": "ON" }
+    },
+    {
+      "name": "tsan",
+      "inherits": "base",
+      "displayName": "Debug + TSan",
+      "description": "ThreadSanitizer over the scan thread pool in src/engine/engine.cc. Its own preset rather than a mode of asan because the two runtimes cannot be linked into one binary; CMakeLists.txt refuses the combination outright.",
+      "cacheVariables": { "AAV_ENABLE_TSAN": "ON" }
+    },
+    {
+      "name": "coverage",
+      "inherits": "base",
+      "displayName": "Debug + coverage (gcovr)",
+      "cacheVariables": { "AAV_ENABLE_COVERAGE": "ON" }
+    },
+    {
+      "name": "fuzz",
+      "inherits": "base",
+      "displayName": "Fuzzers (clang + libFuzzer)",
+      "description": "The libFuzzer harnesses. Tests are off because nothing here runs under CTest, and sigtool is off because the harness does not use it.",
+      "cacheVariables": {
+        "AAV_BUILD_TESTS": "OFF",
+        "AAV_BUILD_FUZZERS": "ON",
+        "AAV_BUILD_TOOLS": "OFF"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "debug", "configurePreset": "debug" },
+    { "name": "release", "configurePreset": "release" },
+    { "name": "asan", "configurePreset": "asan" },
+    { "name": "tsan", "configurePreset": "tsan" },
+    { "name": "coverage", "configurePreset": "coverage" },
+    { "name": "fuzz", "configurePreset": "fuzz" }
+  ],
+  "testPresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "output": { "outputOnFailure": true }
+    },
+    { "name": "debug", "inherits": "base", "configurePreset": "debug" },
+    { "name": "release", "inherits": "base", "configurePreset": "release" },
+    {
+      "name": "asan",
+      "inherits": "base",
+      "configurePreset": "asan",
+      "description": "A UBSan report is only actionable with a stack trace, and the runtime has to be told to collect one. detect_leaks is deliberately absent: LeakSanitizer is already on by default with ASan on Linux, and setting it explicitly would abort every test on macOS, where LSan does not exist.",
+      "environment": { "UBSAN_OPTIONS": "print_stacktrace=1" }
+    },
+    {
+      "name": "tsan",
+      "inherits": "base",
+      "configurePreset": "tsan",
+      "description": "TSan prints a race and lets the process exit 0, so unlike ASan/UBSan the abort has to come from the runtime rather than from -fno-sanitize-recover.",
+      "environment": { "TSAN_OPTIONS": "halt_on_error=1" }
+    },
+    { "name": "coverage", "inherits": "base", "configurePreset": "coverage" }
+  ]
+}

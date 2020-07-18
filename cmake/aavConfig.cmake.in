@@ -1,0 +1,12 @@
+@PACKAGE_INIT@
+
+# aav SDK package config. Consumers:
+#   find_package(aav REQUIRED)
+#   target_link_libraries(app PRIVATE aav::aav)     # static libaav.a
+#   target_link_libraries(app PRIVATE aav::shared)  # shared libaav.so/.dylib
+
+include(CMakeFindDependencyMacro)
+find_dependency(ZLIB)
+find_dependency(Threads)
+
+include("${CMAKE_CURRENT_LIST_DIR}/aavTargets.cmake")

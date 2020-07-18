@@ -1,0 +1,54 @@
+name: Lint
+
+# Formatting and clang-tidy constructs: the gates that answer in about a minute
+# and depend on nothing about the host.
+#
+# Their own file rather than two jobs in a build workflow, because cadence and
+# blast radius are what a workflow boundary should follow. Both share a runner
+# shape (one Linux box, no matrix), a permission set, and a failure mode a
+# developer fixes without reading a build log -- and a separate file is a
+# separate status check, so a stray space reads as "Lint failed" rather than as
+# one red cell among a dozen build legs.
+#
+# The Doxygen gate is not here: docs.yml already builds the site to publish it,
+# and running docs.sh in two workflows on the same commit is one build of the
+# same thing too many. It gates there.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # Not for retrying a flake -- a re-run does that better, on the same commit.
+  # This is for a workflow GitHub has not registered yet.
+  workflow_dispatch:
+
+# Naming any permission drops the rest to none, which is the point: nothing in
+# this file writes anything back to the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  format:
+    name: clang-format
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - run: bash scripts/install-deps-ubuntu.sh
+      - name: Check formatting
+        run: bash scripts/format.sh
+
+  tidy:
+    name: clang-tidy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - run: bash scripts/install-deps-ubuntu.sh
+      # tidy.sh builds the debug preset first if there is no compile database.
+      - name: Check constructs
+        run: bash scripts/tidy.sh

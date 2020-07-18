@@ -1,0 +1,126 @@
+name: Analysis
+
+# The two jobs that measure the engine rather than assert about it: how much of
+# it the suite reaches, and what a fuzzer can do to the DEX parser. Neither
+# proves the code correct, both say something about how well it is covered, and
+# both are the kind of failure you read a report for rather than a diff.
+#
+# Together in one file because they share that character and a permission set.
+# Split by event inside it, because their cadences differ: coverage answers on
+# every change, the fuzzer only builds on every change and runs overnight.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # 03:17 UTC. An odd minute because every job scheduled on the hour competes
+    # for the same runners.
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Only pull request runs are worth cancelling. A nightly fuzz run that a push
+  # to main happens to overlap is 15 minutes of fuzzing, not a superseded check.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  coverage:
+    name: Coverage
+    # Nothing about coverage changes overnight, so the nightly is the fuzzer's.
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      # gcc, so gcovr reads gcov data directly rather than through an llvm-cov
+      # shim -- these are the numbers the floor is calibrated against.
+      CC: gcc
+      CXX: g++
+    steps:
+      - uses: actions/checkout@v5
+      - run: bash scripts/install-deps-ubuntu.sh
+
+      # The floor lives in coverage.sh, not here: a threshold that only exists
+      # in a workflow file is one nobody can reproduce before pushing. Override
+      # it with COVERAGE_FAIL_UNDER if a branch needs to move it deliberately.
+      - name: Build, test, report
+        run: bash scripts/coverage.sh --html
+
+      - name: Resolve build root
+        # Where CMakePresets.json configures into -- a sibling of the checkout,
+        # so it cannot be named with a workspace-relative literal. Ask the script
+        # that owns the answer instead of repeating its arithmetic here.
+        run: echo "AAV_PRESET_ROOT=$(bash -c '. scripts/common.sh; echo "$AAV_PRESET_ROOT"')" >> "$GITHUB_ENV"
+
+      # A failed floor says a number; this says which lines. Uploaded on failure
+      # too -- that is the run where someone actually needs it.
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: ${{ env.AAV_PRESET_ROOT }}/coverage/coverage_html
+          if-no-files-found: warn
+
+  # The two halves of fuzzing are graded differently. Building the harness is a
+  # gate: if fuzz_dexfile stops compiling against the engine API, that is a real
+  # break and it belongs on the pull request. Running it is not: a seedless run
+  # explores different input every time, so gating on it would fail pull
+  # requests for findings they did not introduce.
+  fuzz-build:
+    name: Fuzz build
+    # Skipped on the nightly, where fuzz-run builds anyway and a second
+    # identical build would just be five more minutes of runner.
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v5
+      - run: bash scripts/install-deps-ubuntu.sh
+      # --build-only rather than the workflow inlining cmake: the split between
+      # what gates and what does not is a property of the project, so it lives
+      # in the script both this job and a developer can run.
+      - name: Build the harness
+        run: bash scripts/fuzz.sh --build-only
+
+  fuzz-run:
+    name: Fuzz run (15m)
+    # Not on pull requests -- see above. Skipped there rather than
+    # continue-on-error, so a red result here always means something. No `needs`
+    # on fuzz-build: fuzz.sh configures and builds on its own, so waiting for
+    # the gate would serialize two runs of the same compile.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CC: clang
+      CXX: clang++
+      FUZZ_TIME: "900"
+    steps:
+      - uses: actions/checkout@v5
+      - run: bash scripts/install-deps-ubuntu.sh
+
+      - name: Fuzz
+        run: bash scripts/fuzz.sh
+
+      - name: Resolve build root
+        if: always()
+        run: echo "AAV_PRESET_ROOT=$(bash -c '. scripts/common.sh; echo "$AAV_PRESET_ROOT"')" >> "$GITHUB_ENV"
+
+      # The whole point of running a fuzzer is the input that broke it, and
+      # libFuzzer writes that next to the process it just killed. Without this
+      # step the one artifact worth having dies with the runner.
+      - name: Upload crashing inputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-artifacts
+          path: ${{ env.AAV_PRESET_ROOT }}/fuzz/artifacts
+          if-no-files-found: ignore

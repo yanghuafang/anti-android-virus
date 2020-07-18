@@ -1,0 +1,67 @@
+# Doxygen for aav. Run with scripts/docs.sh, which invokes doxygen from the
+# repository root, so every path below is repo-relative. Only non-default
+# settings appear here.
+
+PROJECT_NAME           = aav
+PROJECT_BRIEF          = "Android malware static detection engine (DEX)"
+OUTPUT_DIRECTORY       = $(AAV_DOCS_DIR)
+
+# Two interface surfaces: include/aav/ is the public ABI-clean SDK,
+# src/api/aav/ the internal object API (never installed). The landing page says
+# which is which. The implementation directories come along so a documented
+# type links to the class that implements it.
+INPUT                  = include src docs/doxygen/ApiMainPage.md
+USE_MDFILE_AS_MAINPAGE = docs/doxygen/ApiMainPage.md
+RECURSIVE              = YES
+FILE_PATTERNS          = *.h *.cc *.md
+
+# Vendored upstream (miniz, doctest); doctest alone would add thousands of
+# declarations.
+EXCLUDE                = third_party
+
+# EXTRACT_ALL would manufacture an empty page for every declaration and bury
+# the ones that say something. The /// comments are in the interface headers,
+# so those are the site.
+EXTRACT_ALL            = NO
+EXTRACT_STATIC         = YES
+HIDE_UNDOC_MEMBERS     = YES
+HIDE_UNDOC_CLASSES     = YES
+
+# First sentence of a /// block is the brief, the rest detail -- so header
+# prose becomes documentation without a \brief in front of it.
+JAVADOC_AUTOBRIEF      = YES
+MARKDOWN_SUPPORT       = YES
+BUILTIN_STL_SUPPORT    = YES
+
+# The hierarchy is what the diagrams are for: IObject -> IScanObject ->
+# IStream/ITarget -> the four concrete file/memory classes is the design the
+# engine rests on, and it is spread across nine headers.
+HAVE_DOT               = YES
+UML_LOOK               = YES
+DOT_IMAGE_FORMAT       = svg
+INTERACTIVE_SVG        = YES
+
+# Pin the file-naming scheme: its default moved between Doxygen releases, and
+# the published URLs are the casualty. 1.9 writes classaav_1_1IEngine.html,
+# 1.18 writes classaav_1_1_i_engine.html for the same class. Both sites work,
+# but a saved link breaks whenever the runner's Doxygen changes. YES is what is
+# already published.
+CASE_SENSE_NAMES       = YES
+
+# Class diagrams yes, directory ones no: Doxygen emits a page per pair of
+# directories that include each other, each restating one #include edge. The
+# layering is already prose in docs/Architecture.md and docs/ObjectModel.md.
+DIRECTORY_GRAPH        = NO
+
+GENERATE_LATEX         = NO
+GENERATE_HTML          = YES
+
+# Warnings are the gate: docs.sh fails when this log is non-empty, because
+# doxygen exits 0 after complaining about a broken reference. Undocumented
+# entities are not warned about; documenting every declaration is not the goal.
+QUIET                  = YES
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = NO
+WARN_IF_DOC_ERROR      = YES
+WARN_NO_PARAMDOC       = YES
+WARN_LOGFILE           = $(AAV_DOCS_DIR)/doxygen-warnings.log

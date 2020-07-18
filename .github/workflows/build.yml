@@ -1,0 +1,87 @@
+name: Build
+
+# Build and run the CTest suite across the axes that are cheap to cross: two
+# host platforms, the compilers each one has, and both build types.
+#
+# One job per platform rather than one per combination. The combinations still
+# all run -- they are the loop below -- but they report as "Build / Ubuntu" and
+# "Build / macOS", which is what someone reads when a pull request goes red, and
+# what branch protection names without having to track a generated leg name.
+#
+# Release is an axis rather than an afterthought: -O2 takes different paths
+# through the DEX and zip parsers than -O0, and assert() is compiled out, so a
+# Debug-only suite never executes the code that ships.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: ${{ matrix.timeout }}
+    strategy:
+      # Report both platforms even if one fails.
+      fail-fast: false
+      matrix:
+        # Pinned images, not -latest: the runner label is the thing that
+        # silently decides which compiler and which clang-format this project is
+        # actually tested against. macOS carries no gcc worth testing -- it is a
+        # clang shim -- which is why the compiler list is per-platform rather
+        # than a second matrix axis that would need half its cells excluded.
+        include:
+          - name: Ubuntu
+            os: ubuntu-24.04
+            compilers: gcc:g++ clang:clang++
+            timeout: 60
+          - name: macOS
+            os: macos-15
+            compilers: clang:clang++
+            timeout: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      # Linux only. The macOS legs build with Apple Clang and the image's own
+      # CMake, and install-deps-macos.sh would spend minutes on the llvm@18 keg
+      # for clang-format and clang-tidy -- tools lint.yml runs, not this one.
+      - name: Install deps (Linux)
+        if: runner.os == 'Linux'
+        run: bash scripts/install-deps-ubuntu.sh
+
+      # Every combination runs even after one fails, so a red job reports all of
+      # them rather than only the first. Each is three commands against a preset
+      # that carries the build type and AAV_BUILD_TESTS, so reproducing one is
+      # copying the line under its log group -- no flags live in this file.
+      #
+      # --fresh because a preset owns its build directory: switching CC in a
+      # configured tree is an error ("CMAKE_CXX_COMPILER changed"), so each
+      # combination starts from a discarded cache rather than a stale one.
+      - name: Build & test
+        run: |
+          rc=0
+          for pair in ${{ matrix.compilers }}; do
+            cc="${pair%%:*}"; cxx="${pair#*:}"
+            for preset in debug release; do
+              echo "::group::$cc / $preset"
+              if CC="$cc" CXX="$cxx" cmake --preset "$preset" --fresh \
+                && cmake --build --preset "$preset" -j \
+                && ctest --preset "$preset"; then
+                echo "$cc / $preset: ok"
+              else
+                echo "::error::$cc / $preset failed"
+                rc=1
+              fi
+              echo "::endgroup::"
+            done
+          done
+          exit $rc

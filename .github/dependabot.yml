@@ -1,0 +1,21 @@
+version: 2
+
+# Actions drift the way an unpinned runner image does, only more quietly: a
+# `@v5` tag keeps moving inside its major, and the majors themselves went one to
+# three releases stale here without anything noticing.
+#
+# Bumping them is deliberately not done by hand alongside a workflow change. A
+# single pull request per action, each one running the full set of checks, is
+# what makes "the deploy broke" separable from "the refactor broke it".
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      # One pull request for the routine no-op bumps, individual ones for
+      # anything that changes a major -- that is where the Node runtime and the
+      # input names move.
+      actions-minor:
+        update-types: [minor, patch]
+    labels: [ci]

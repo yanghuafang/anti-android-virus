@@ -1,0 +1,226 @@
+# clang-tidy for aav. Run with scripts/tidy.sh.
+#
+# The tree follows the Google C++ Style Guide, so the whole google-* family is
+# on and CI keeps it clean. The rest of the list is the few rules the guide
+# states that google-* does not implement.
+#
+# Vendored code under third_party/ is exempt and keeps its own conventions;
+# third_party/.clang-tidy turns every check off for it.
+#
+# Scope is style and redundancy. Bug-hunting (clang-analyzer-*, and bugprone-*
+# except the one naming check named below) is left to the tools that execute the
+# code -- the ASan/UBSan build and the libFuzzer harness -- so that a finding
+# here is always actionable. For the record, clang-analyzer's one remaining
+# report on this tree is a division by zero in Blowfish::SetKey that the
+# empty-key guard above it already returns on.
+#
+# Four rules of the guide have no check and are held by review instead:
+#   Include paths     "utils/log.h", never "log.h"; src/ and src/api/ are the
+#                     only internal roots, so each spelling names one file.
+#   Acronyms as words FileId, DexCodeCrc, AcTree -- not FileID. The `I` on
+#                     IStream is a prefix, not an acronym. A case style is a
+#                     regex over the shape of a name, so no naming option can
+#                     see where its words divide: kSboxLength passes, and so
+#                     would kSBoxLength.
+#   Copy and move     Stated, never implicit. IObject deletes both at the root;
+#                     classes outside that hierarchy state their own.
+#   final             Every concrete implementation is a leaf, and final is what
+#                     makes the Init()/Uninit() call in its destructor
+#                     non-virtual.
+#
+# Added on top of google-*:
+#   misc-unused-parameters      the guide's "comment out the name" rule.
+#   bugprone-reserved-identifier  the guide's "no leading underscore, and give
+#                               macros a project prefix" rule, for the half
+#                               readability-identifier-naming cannot state:
+#                               a case style says nothing about _foo or
+#                               __LITTLE_ENDIAN__. Named bugprone-* but a
+#                               naming check (cert-dcl37-c aliases it), so it
+#                               is in scope here.
+#   modernize-use-using         aliases are `using`, not `typedef`.
+#   modernize-deprecated-headers  the guide names <cstdint>; call sites are
+#                               qualified to match (std::memcpy). Only headers
+#                               with no C++ form keep the C spelling.
+#   cppcoreguidelines-prefer-member-initializer  not a rule of the guide, which
+#                               allows either form. On because the tree already
+#                               uses initializer lists everywhere, and this
+#                               keeps the next constructor from drifting.
+#
+# Disabled, with the reason:
+#   cppcoreguidelines-special-member-functions
+#       Per-class and syntactic, so it reports the ten IObject subclasses that
+#       inherit the deletion from the root. Satisfying it means repeating two
+#       declarations in each.
+#   cppcoreguidelines-virtual-class-destructor
+#       Wants IObject's destructor protected+non-virtual. It is protected *and*
+#       virtual on purpose: protected so callers cannot `delete` across the
+#       library boundary, virtual because Destroy() does `delete this` and
+#       every implementation is destroyed through it. Dropping virtual leaks
+#       every derived member.
+#   modernize-use-default-member-init
+#       36 hits; the guide allows either form and every constructor here uses
+#       the initializer list. Taking it would leave two spellings.
+#   modernize-use-trailing-return-type
+#       538 signatures rewritten to `auto f() -> int`, burying the status codes
+#       and ObjPtr<T> the API is mostly about.
+#   modernize-use-auto
+#       61 hits, nearly all `const uint8_t* p = static_cast<...>(buf)`, where
+#       auto hides the pointer type the arithmetic below depends on.
+#   readability-implicit-bool-conversion
+#       68 hits. int status codes and int flags in the POD config structs are
+#       deliberate: they cross the ABI boundary, where a C caller has no bool.
+#   readability-magic-numbers
+#       339 hits, nearly all DEX structure constants next to the format comment
+#       that explains them.
+#   readability-function-cognitive-complexity
+#       The DEX table walkers and opcode dispatch are branchy by nature;
+#       splitting to a threshold scatters logic that mirrors the DEX layout.
+#   readability-identifier-length
+#       Flags `p`, `m`, `cb`, `ec`.
+#   bugprone-easily-swappable-parameters
+#       Fires on the LEB128 (buf, end, value, bytes_read) and stream
+#       (data, size) signatures, which is the shape the domain calls for.
+#   bugprone-narrowing-conversions
+#       24 hits, each a DEX u4 stored into the int the stream API uses for
+#       sizes, bounded by a range check the checker cannot see.
+#   performance-enum-size
+#       The DEX and signature enums are serialized against the on-disk format,
+#       so their width is a format decision.
+
+Checks: >
+  -*,
+  google-*,
+  bugprone-reserved-identifier,
+  cert-err34-c,
+  cppcoreguidelines-init-variables,
+  cppcoreguidelines-prefer-member-initializer,
+  misc-definitions-in-headers,
+  misc-unused-parameters,
+  modernize-deprecated-headers,
+  modernize-use-bool-literals,
+  modernize-use-equals-default,
+  modernize-use-nullptr,
+  modernize-use-override,
+  modernize-use-using,
+  performance-avoid-endl,
+  performance-for-range-copy,
+  performance-inefficient-vector-operation,
+  performance-move-const-arg,
+  performance-trivially-destructible,
+  performance-unnecessary-value-param,
+  readability-avoid-const-params-in-decls,
+  readability-const-return-type,
+  readability-container-size-empty,
+  readability-convert-member-functions-to-static,
+  readability-else-after-return,
+  readability-inconsistent-declaration-parameter-name,
+  readability-identifier-naming,
+  readability-make-member-function-const,
+  readability-math-missing-parentheses,
+  readability-named-parameter,
+  readability-non-const-parameter,
+  readability-qualified-auto,
+  readability-redundant-control-flow,
+  readability-redundant-declaration,
+  readability-redundant-member-init,
+  readability-redundant-string-cstr,
+  readability-simplify-boolean-expr,
+  readability-static-definition-in-anonymous-namespace
+
+# An allow-list, not an exclude-list: third_party/ is left out by not being
+# named, so no second key is needed here (and third_party/.clang-tidy disables
+# every check for anything under it, which is what covers a direct run or an
+# IDE). ExcludeHeaderFilterRegex would say it more directly, but that key was
+# added in clang-tidy 19 and this file has to parse under 18 -- the unversioned
+# `clang-tidy` package on the current ubuntu-latest. An unknown key is not a
+# warning: clang-tidy discards the whole file and falls back to its defaults,
+# which are clang-analyzer-*, so the run reports findings this list never asked
+# for while enforcing none of the ones it did.
+#
+# clang-tidy matches this with llvm::Regex (POSIX ERE, no lookahead), and a
+# pattern it cannot compile does not fail the run: every path simply stops
+# matching, so the check would report clean while analyzing no header at all.
+# Verify a change here by confirming a deliberate slip in a .h is still
+# reported.
+HeaderFilterRegex: '(include|src|apps|tests|fuzz)/.*\.h$'
+
+WarningsAsErrors: ""
+FormatStyle: file
+
+# The guide's naming rules; no google-* check reads names.
+#
+# Shorter than the set of options the check offers, because it resolves an
+# identifier from the most specific kind to the least and falls back when the
+# specific kind is unset. Measured, not assumed -- these fall back and are
+# therefore absent:
+#
+#   GlobalVariable, StaticVariable, LocalVariable, LocalConstant,
+#   LocalPointer, GlobalPointer   -> Variable
+#   ConstantParameter, PointerParameter, ConstantPointerParameter -> Parameter
+#   GlobalConstantPointer         -> GlobalConstant, keeping the k
+#   ScopedEnumConstant            -> EnumConstant
+#   AbstractClass                 -> Class
+#   ParameterPack                 -> TypeTemplateParameter
+#   Method, StaticMethod, VirtualMethod, ConstexprMethod -> Function
+#
+# Two kinds have no fallback of their own and so are set explicitly below:
+# InlineNamespace and ValueTemplateParameter. Verify a change here by giving a
+# name of the kind in question a deliberately wrong spelling and confirming it
+# is still reported.
+CheckOptions:
+  # Types.
+  readability-identifier-naming.NamespaceCase: lower_case
+  # No fallback to NamespaceCase; the guide bans inline namespaces outright.
+  readability-identifier-naming.InlineNamespaceCase: lower_case
+  readability-identifier-naming.ClassCase: CamelCase
+  readability-identifier-naming.StructCase: CamelCase
+  readability-identifier-naming.UnionCase: CamelCase
+  readability-identifier-naming.EnumCase: CamelCase
+  readability-identifier-naming.TypeAliasCase: CamelCase
+  readability-identifier-naming.TypedefCase: CamelCase
+  readability-identifier-naming.TypeTemplateParameterCase: CamelCase
+  readability-identifier-naming.TemplateTemplateParameterCase: CamelCase
+
+  # Functions. Methods reach FunctionCase by fallback.
+  readability-identifier-naming.FunctionCase: CamelCase
+
+  # Variables and parameters.
+  readability-identifier-naming.VariableCase: lower_case
+  readability-identifier-naming.ParameterCase: lower_case
+
+  # Data members. The guide's trailing underscore applies to a class, not to a
+  # struct, and the check cannot tell them apart -- both are CXXRecordDecl.
+  # Access is the usable proxy: a struct's members are public, a class's are
+  # private or protected. What this leaves to review is the rare public member
+  # of a class, which the guide does want suffixed.
+  readability-identifier-naming.PublicMemberCase: lower_case
+  readability-identifier-naming.PrivateMemberCase: lower_case
+  readability-identifier-naming.PrivateMemberSuffix: _
+  readability-identifier-naming.ProtectedMemberCase: lower_case
+  readability-identifier-naming.ProtectedMemberSuffix: _
+  # Static data members would otherwise reach VariableCase and lose the suffix.
+  readability-identifier-naming.ClassMemberCase: lower_case
+  readability-identifier-naming.ClassMemberSuffix: _
+
+  # Constants: `k` on anything whose value is fixed for the whole run.
+  readability-identifier-naming.EnumConstantCase: CamelCase
+  readability-identifier-naming.EnumConstantPrefix: k
+  readability-identifier-naming.ConstexprVariableCase: CamelCase
+  readability-identifier-naming.ConstexprVariablePrefix: k
+  readability-identifier-naming.GlobalConstantCase: CamelCase
+  readability-identifier-naming.GlobalConstantPrefix: k
+  readability-identifier-naming.StaticConstantCase: CamelCase
+  readability-identifier-naming.StaticConstantPrefix: k
+  readability-identifier-naming.ClassConstantCase: CamelCase
+  readability-identifier-naming.ClassConstantPrefix: k
+  # No fallback of its own. The guide is of two minds -- Template Parameters
+  # sends a non-type parameter to Variable names, Constant Names claims
+  # anything const and fixed -- so it follows the other constants here.
+  readability-identifier-naming.ValueTemplateParameterCase: CamelCase
+  readability-identifier-naming.ValueTemplateParameterPrefix: k
+
+  # Macros are UPPER_CASE, which rejects the trailing underscore the guide's
+  # own include-guard form ends with, so guards are exempt by their full shape
+  # rather than a bare _H_$ that could excuse an unrelated macro.
+  readability-identifier-naming.MacroDefinitionCase: UPPER_CASE
+  readability-identifier-naming.MacroDefinitionIgnoredRegexp: "^AAV_[A-Z0-9_]+_H_$"
