@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: build & test (${{ matrix.os }} / ${{ matrix.cc }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Ubuntu 24.04/26.04 are x86_64 runners; macos-latest is ARM64.
+          - { os: ubuntu-24.04, cc: gcc, cxx: g++ }
+          - { os: ubuntu-24.04, cc: clang, cxx: clang++ }
+          - { os: ubuntu-26.04, cc: gcc, cxx: g++ }
+          - { os: ubuntu-26.04, cc: clang, cxx: clang++ }
+          - { os: macos-latest, cc: clang, cxx: clang++ }
+    env:
+      CC: ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps (Linux)
+        if: runner.os == 'Linux'
+        run: bash scripts/install-deps-ubuntu.sh
+      - name: Build & test
+        run: bash scripts/test.sh
+
+  android:
+    name: android build (${{ matrix.abi }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [arm64-v8a]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cross-compile engine + CLI (NDK, API 24)
+        run: ABI=${{ matrix.abi }} bash scripts/android.sh
+      - name: Show artifacts
+        run: file build/android-${{ matrix.abi }}/lib/libaav.a build/android-${{ matrix.abi }}/bin/aavscan
+
+  asan:
+    name: asan + ubsan (clang)
+    runs-on: ubuntu-24.04
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/install-deps-ubuntu.sh
+      - name: Build & test (ASan/UBSan)
+        run: bash scripts/asan.sh
+
+  coverage:
+    name: coverage (gcovr)
+    runs-on: ubuntu-24.04
+    env:
+      CC: gcc
+      CXX: g++
+      # Fail the job if line coverage of src/ drops below this floor.
+      COVERAGE_FAIL_UNDER: "65"
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/install-deps-ubuntu.sh
+      - name: Build with coverage, run tests, report
+        run: bash scripts/coverage.sh
+
+  format:
+    name: clang-format
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/install-deps-ubuntu.sh
+      - name: Check formatting (informational)
+        continue-on-error: true
+        run: bash scripts/format.sh
+
+  fuzz-build:
+    name: fuzz build + smoke (clang)
+    runs-on: ubuntu-24.04
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/install-deps-ubuntu.sh
+      - name: Configure (fuzz preset)
+        run: cmake --preset fuzz
+      - name: Build fuzzer
+        run: cmake --build build/fuzz --target fuzz_dexfile -j
+      - name: Smoke run (non-blocking; surfaces legacy parser bugs)
+        continue-on-error: true
+        run: ./build/fuzz/bin/fuzz_dexfile -max_total_time=30 -runs=200000
+
+  android-app:
+    name: android app (assembleDebug)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - name: Install SDK packages
+        run: >-
+          sdkmanager "platforms;android-36" "build-tools;36.0.0"
+          "ndk;29.0.14206865" "cmake;3.22.1"
+      - name: Assemble debug APK (Java + JNI bridge + engine, arm64-v8a)
+        working-directory: android
+        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aav-app-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error

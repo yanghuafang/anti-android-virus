@@ -1,32 +1,83 @@
-# Prerequisites
-*.d
+# ---- CMake / Gradle / NDK build output -----------------------------------
+# CMake configures out-of-source into build/ (CMakePresets.json / scripts/);
+# Gradle and the NDK build into build/, .gradle/ and .cxx/ as well. A bare
+# "build/" matches a directory named build at any depth (incl. android/app/).
+build/
+.gradle/
+.cxx/
+.externalNativeBuild/
+captures/
 
-# Compiled Object files
+# CMake leftovers from an accidental in-source configure.
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+
+# clangd / language-server cache + compile database.
+.cache/
+compile_commands.json
+
+# ---- Compiled artifacts (standard C/C++) ---------------------------------
+# Prerequisites (compiler dependency files)
+*.d
+# Object files
 *.slo
 *.lo
 *.o
 *.obj
-
-# Precompiled Headers
+# Precompiled headers
 *.gch
 *.pch
-
-# Compiled Dynamic libraries
+# Dynamic libraries
 *.so
 *.dylib
 *.dll
-
 # Fortran module files
 *.mod
 *.smod
-
-# Compiled Static libraries
+# Static libraries
 *.lai
 *.la
 *.a
 *.lib
-
 # Executables
 *.exe
 *.out
 *.app
+
+# ---- Generated sample data (sigtool gen-sample) --------------------------
+sample.dex
+sample.sig
+
+# ---- Android app ---------------------------------------------------------
+# Machine-local config (SDK path, etc.) -- never commit.
+local.properties
+# Build / profiling output.
+*.apk
+*.hprof
+*.log
+output.json
+# Signing material -- never commit.
+*.jks
+*.keystore
+# Firebase / Google services config.
+google-services.json
+
+# ---- IDE / editor --------------------------------------------------------
+# JetBrains / Android Studio (.idea/ covers misc.xml, *.iml, etc.).
+.idea/
+*.iml
+# Editor backup / swap files (vim, emacs, ...).
+*~
+*.swp
+*.swo
+*.swn
+
+# ---- OS metadata ---------------------------------------------------------
+# macOS (Finder metadata; AppleDouble sidecars on non-APFS volumes)
+.DS_Store
+._*
+# Linux (KDE per-folder view; NFS silly-rename temp files)
+.directory
+.nfs*
