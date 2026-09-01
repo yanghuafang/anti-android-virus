@@ -65,7 +65,7 @@ jobs:
           java-version: "17"
           cache: gradle
 
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
 
       # The same pinned list the install-deps scripts use, read by the same
       # helper, so CI and a developer machine cannot drift apart.
