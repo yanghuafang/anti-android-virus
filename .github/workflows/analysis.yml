@@ -60,7 +60,7 @@ jobs:
       # too -- that is the run where someone actually needs it.
       - name: Upload HTML report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-html
           path: ${{ env.AAV_PRESET_ROOT }}/coverage/coverage_html
@@ -119,7 +119,7 @@ jobs:
       # step the one artifact worth having dies with the runner.
       - name: Upload crashing inputs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fuzz-artifacts
           path: ${{ env.AAV_PRESET_ROOT }}/fuzz/artifacts
