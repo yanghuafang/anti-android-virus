@@ -49,7 +49,7 @@ jobs:
             compilers: clang:clang++
             timeout: 45
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # Linux only. The macOS legs build with Apple Clang and the image's own
       # CMake, and install-deps-macos.sh would spend minutes on the llvm@18 keg

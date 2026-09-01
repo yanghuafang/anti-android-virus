@@ -31,7 +31,7 @@ jobs:
       CC: clang
       CXX: clang++
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - run: bash scripts/install-deps-ubuntu.sh
 
       # Ubuntu 24.04 raised vm.mmap_rnd_bits to 32, which ASan runtimes older
@@ -59,7 +59,7 @@ jobs:
       CC: clang
       CXX: clang++
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - run: bash scripts/install-deps-ubuntu.sh
 
       # What this covers and asan cannot: the scan thread pool in

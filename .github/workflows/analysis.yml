@@ -41,7 +41,7 @@ jobs:
       CC: gcc
       CXX: g++
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - run: bash scripts/install-deps-ubuntu.sh
 
       # The floor lives in coverage.sh, not here: a threshold that only exists
@@ -82,7 +82,7 @@ jobs:
       CC: clang
       CXX: clang++
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - run: bash scripts/install-deps-ubuntu.sh
       # --build-only rather than the workflow inlining cmake: the split between
       # what gates and what does not is a property of the project, so it lives
@@ -104,7 +104,7 @@ jobs:
       CXX: clang++
       FUZZ_TIME: "900"
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - run: bash scripts/install-deps-ubuntu.sh
 
       - name: Fuzz

@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - run: bash scripts/install-deps-ubuntu.sh
       - name: Check formatting
         run: bash scripts/format.sh
@@ -47,7 +47,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - run: bash scripts/install-deps-ubuntu.sh
       # tidy.sh builds the debug preset first if there is no compile database.
       - name: Check constructs
